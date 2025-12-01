@@ -53,7 +53,7 @@ class _CreateAccountPage1State extends State<CreateAccountPage1> {
 
               // หัวข้อ สร้างบัญชี
               Text(
-                "สร้างบัญชี", // เปลี่ยนเป็นภาษาไทย
+                "สร้างบัญชีเลยหนุ่มๆ", // เปลี่ยนเป็นภาษาไทย
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,
