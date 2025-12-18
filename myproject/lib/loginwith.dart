@@ -1,26 +1,7 @@
+// loginwith.dart
 import 'package:flutter/material.dart';
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'JibJob App',
-      theme: ThemeData(
-        // กำหนดสีหลักของแอปตามรูป (เช่น สีน้ำเงินเข้มสำหรับปุ่ม)
-        primarySwatch: Colors.blue,
-        // กำหนดพื้นหลังหลักของ Scaffold เป็นสีม่วงอ่อนๆ (ตามขอบนอกของรูป)
-        scaffoldBackgroundColor: const Color(0xFFF0F0FF), // สีม่วงอ่อน
-      ),
-      home: const JibJobLoginPage(),
-    );
-  }
-}
+// ต้อง import ไฟล์หน้าสร้างบัญชีเพื่อให้ Navigator รู้จักคลาส CreateAccountPage1
+import 'package:myproject/logincreate1.dart';
 
 class JibJobLoginPage extends StatelessWidget {
   const JibJobLoginPage({super.key});
@@ -28,9 +9,7 @@ class JibJobLoginPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // กำหนดสีหลักสำหรับปุ่ม
-    final Color primaryButtonColor = const Color(
-      0xFF1A3766,
-    ); // สีน้ำเงินเข้มสำหรับปุ่มหลัก
+    final Color primaryButtonColor = const Color(0xFF1A3766);
     const double buttonHeight = 50.0;
     const double buttonRadius = 10.0;
     const TextStyle buttonTextStyle = TextStyle(
@@ -39,38 +18,33 @@ class JibJobLoginPage extends StatelessWidget {
     );
 
     return Scaffold(
-      // AppBar สามารถใช้สำหรับแสดงข้อความ "เข้าสู่ระบบ" ด้านบน
       appBar: AppBar(
         title: const Text(
           'เข้าสู่ระบบ',
-          style: TextStyle(
-            color: Colors.black, // สีของข้อความใน AppBar
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.white, // พื้นหลังของ AppBar เป็นสีขาว
-        elevation: 0, // ลบเงา
+        backgroundColor: Colors.white,
+        elevation: 0,
         centerTitle: true,
       ),
-      // ใช้ SingleChildScrollView เพื่อให้เลื่อนได้หากหน้าจอมีขนาดเล็ก
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              // 1. ส่วนของโลโก้ JibJob และพื้นหลังรูปวาด
+              // 1. ส่วนของโลโก้
               _buildLogoSection(context),
 
               const SizedBox(height: 50),
 
-              // 2. ปุ่ม "เข้าสู่ระบบ" หลัก
+              // 2. ปุ่ม "เข้าสู่ระบบ"
               ElevatedButton(
                 onPressed: () {
-                  // TODO: เพิ่ม logic เมื่อกดปุ่มเข้าสู่ระบบ
+                  // TODO: เพิ่ม logic เข้าสู่ระบบ
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryButtonColor, // สีน้ำเงินเข้ม
+                  backgroundColor: primaryButtonColor,
                   minimumSize: const Size.fromHeight(buttonHeight),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(buttonRadius),
@@ -78,21 +52,25 @@ class JibJobLoginPage extends StatelessWidget {
                 ),
                 child: Text(
                   'เข้าสู่ระบบ',
-                  style: buttonTextStyle.copyWith(
-                    color: Colors.white,
-                  ), // ข้อความสีขาว
+                  style: buttonTextStyle.copyWith(color: Colors.white),
                 ),
               ),
 
               const SizedBox(height: 15),
 
-              // 3. ปุ่ม "สร้างบัญชี" หลัก
+              // 3. ปุ่ม "สร้างบัญชี" (แก้ไขจุดนี้เพื่อให้กดไปหน้า 2 ได้)
               ElevatedButton(
                 onPressed: () {
-                  // TODO: เพิ่ม logic เมื่อกดปุ่มสร้างบัญชี
+                  // ใช้ Navigator เพื่อเปิดหน้า CreateAccountPage1
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CreateAccountPage1(),
+                    ),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryButtonColor, // สีน้ำเงินเข้ม
+                  backgroundColor: primaryButtonColor,
                   minimumSize: const Size.fromHeight(buttonHeight),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(buttonRadius),
@@ -100,36 +78,34 @@ class JibJobLoginPage extends StatelessWidget {
                 ),
                 child: Text(
                   'สร้างบัญชี',
-                  style: buttonTextStyle.copyWith(
-                    color: Colors.white,
-                  ), // ข้อความสีขาว
+                  style: buttonTextStyle.copyWith(color: Colors.white),
                 ),
               ),
 
               const SizedBox(height: 30),
 
-              // 4. ปุ่มเข้าสู่ระบบผ่าน Social Media / ThaiID
+              // 4. ปุ่ม Social Login ต่างๆ
               _buildSocialLoginButton(
-                iconPath: 'assets/google_logo.png', // สมมติว่ามีรูปโลโก้ Google
+                iconPath: 'assets/google.png',
                 text: 'เข้าสู่ระบบผ่าน Google',
                 onPressed: () {},
               ),
               const SizedBox(height: 15),
               _buildSocialLoginButton(
-                iconPath: 'assets/apple_logo.png', // สมมติว่ามีรูปโลโก้ Apple
-                text: 'เข้าสู่ระบบผ่าน Apple',
+                iconPath: 'assets/facebook.png',
+                text: 'เข้าสู่ระบบผ่าน Facebook',
                 onPressed: () {},
               ),
               const SizedBox(height: 15),
               _buildSocialLoginButton(
-                iconPath: 'assets/line_logo.png', // สมมติว่ามีรูปโลโก้ Line
+                iconPath: 'assets/line.png',
                 text: 'เข้าสู่ระบบผ่าน Line',
                 onPressed: () {},
               ),
               const SizedBox(height: 15),
               _buildSocialLoginButton(
-                iconPath: 'assets/thaiid_logo.png', // สมมติว่ามีรูปโลโก้ ThaiID
-                text: 'เข้าสู่ระบบผ่าน ThaiID',
+                iconPath: 'assets/thaid.png',
+                text: 'เข้าสู่ระบบผ่าน ThaID',
                 onPressed: () {},
               ),
             ],
@@ -139,70 +115,59 @@ class JibJobLoginPage extends StatelessWidget {
     );
   }
 
-  // Widget สำหรับส่วนโลโก้และพื้นหลังรูปวาด
   Widget _buildLogoSection(BuildContext context) {
-    // ส่วนนี้ควรใช้ Image.asset หรือ CustomPaint สำหรับรูปวาดพื้นหลัง
-    // ในโค้ดตัวอย่างนี้จะใช้เพียง Container และ Text สำหรับจำลองตำแหน่งโลโก้
     return Container(
       alignment: Alignment.center,
-      height: 250, // กำหนดความสูงสำหรับส่วนนี้
-      // *******
-      // NOTE: ส่วนนี้จะแทนที่ด้วยรูปวาดพื้นหลังและโลโก้ JibJob จริงๆ
-      // *******
+      height: 250,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // แสดงโลโก้
-          Image.asset('assets/jibjob.png', height: 120),
-          // หรือใช้ Text แทนโลโก้ ถ้าหาไฟล์ไม่เจอ
-          // const Text(
-          //   'JibJob',
-          //   style: TextStyle(
-          //     fontSize: 50,
-          //     fontWeight: FontWeight.bold,
-          //     color: primaryButtonColor,
-          //   ),
-          // ),
+          // ป้องกัน error ถ้ายังไม่มีไฟล์รูปภาพ ให้เช็คชื่อไฟล์ assets ให้ตรงกันด้วยครับ
+          Image.asset(
+            'assets/jibjob.png',
+            height: 120,
+            errorBuilder: (context, error, stackTrace) {
+              return const Text(
+                'JibJob Logo',
+                style: TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A3766),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
   }
 
-  // Widget สำหรับปุ่ม Social Login
   Widget _buildSocialLoginButton({
     required String iconPath,
     required String text,
     required VoidCallback onPressed,
   }) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        backgroundColor: Colors.white, // พื้นหลังสีขาว
-        side: const BorderSide(color: Colors.grey, width: 0.5), // ขอบสีเทาอ่อน
-        minimumSize: const Size.fromHeight(50.0),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10.0),
-        ),
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        elevation: 1,
       ),
+      onPressed: onPressed,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // แทนที่ด้วย Image.asset(iconPath, height: 24)
-          // ในโค้ดตัวอย่างจะใช้ Icon แทน
-          const Icon(
-            Icons.star,
-            color: Colors.black,
-            size: 24,
-          ), // ใช้ Icon ชั่วคราว
-          const SizedBox(width: 10),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
+          // ป้องกัน error ถ้าไม่มีไฟล์ไอคอน
+          Image.asset(
+            iconPath,
+            width: 22,
+            height: 22,
+            errorBuilder: (context, error, stackTrace) =>
+                const Icon(Icons.login, size: 22),
           ),
+          const SizedBox(width: 15),
+          Text(text, style: const TextStyle(fontSize: 16)),
         ],
       ),
     );
