@@ -1,5 +1,5 @@
 // home.dart
-
+import 'post_job.dart';
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -55,7 +55,7 @@ class HomeScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           buildModeSelector(),
-          buildCallJobberButton(),
+          buildCallJobberButton(context),
           buildCategorySection(),
           // เมื่อ buildBody รับ context แล้ว การเรียกใช้ตรงนี้จะถูกต้อง
           buildSectionTitle("งานที่กำลังรอให้ช่วย"),
@@ -106,13 +106,20 @@ class HomeScreen extends StatelessWidget {
   }
 
   // ------------------ CALL JOBBER BUTTON ------------------
-  Widget buildCallJobberButton() {
+  Widget buildCallJobberButton(BuildContext context) {
+    // 💡 รับ context เข้ามา
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: () {},
+          // 💡 เชื่อมโยง Navigator ไปยังหน้า CreateJobScreen
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const CreateJobScreen()),
+            );
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF5AB6E3),
             foregroundColor: Colors.white,

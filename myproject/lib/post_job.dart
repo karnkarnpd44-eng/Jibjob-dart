@@ -1,0 +1,461 @@
+import 'package:flutter/material.dart';
+
+class PostJobScreen extends StatefulWidget {
+  const PostJobScreen({Key? key}) : super(key: key);
+
+  @override
+  State<PostJobScreen> createState() => _PostJobScreenState();
+}
+
+class _PostJobScreenState extends State<PostJobScreen> {
+  final TextEditingController _titleController = TextEditingController(
+    text: 'คนพาหมาไปเดินเล่น',
+  );
+  final TextEditingController _descController = TextEditingController(
+    text: 'น้องหมา 2 ตัว ตัวผู้กับตัวเมีย',
+  );
+  final TextEditingController _addressController = TextEditingController(
+    text: '123/45 หมู่บ้านสุขใจ ลาดพร้าว80',
+  );
+  final TextEditingController _dateController = TextEditingController(
+    text: '12/11/2568',
+  );
+  final TextEditingController _timeController = TextEditingController(
+    text: '16:30-17:30',
+  );
+  final TextEditingController _priceController = TextEditingController(
+    text: '100 บาท',
+  );
+
+  // ตัวเลือกการชำระเงินตามเอกสาร: เงินสด หรือ QR Code ส่วนตัว
+  String _paymentMethod = 'QR Code';
+
+  // สไตล์กรอบ Input สีฟ้าขอบมนตาม Mockup
+  final OutlineInputBorder _blueInputBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12),
+    borderSide: const BorderSide(color: Color(0xFF4AC4F3), width: 1.5),
+  );
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    _addressController.dispose();
+    _dateController.dispose();
+    _timeController.dispose();
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  // Warning Pop-up แจ้งเตือนข้อตกลงเรื่องความเสี่ยงตามบทที่ 1 และ 3
+  void _showWarningPopup() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 26),
+              SizedBox(width: 8),
+              Text(
+                'ข้อตกลงเรื่องความเสี่ยง',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: const SingleChildScrollView(
+            child: Text(
+              'โปรดรับทราบเงื่อนไขความเสี่ยงในการจ้างงาน:\n\n'
+              '1. แพลตฟอร์ม JibJob เป็นเพียงสื่อกลางในการเชื่อมโยงระหว่างผู้ว่าจ้างและผู้รับจ้าง\n'
+              '2. การชำระเงินค่าตอบแทนเป็นการตกลงโดยตรงระหว่างผู้ใช้ผ่านเงินสดหรือ QR Code ส่วนตัว\n'
+              '3. แพลตฟอร์มไม่มีส่วนรับผิดชอบต่อความเสียหายของทรัพย์สิน หรือข้อพิพาททางการเงิน\n'
+              '4. โปรดตรวจสอบรายละเอียดและดูแลทรัพย์สินของท่านอย่างรอบคอบ',
+              style: TextStyle(fontSize: 14, height: 1.4),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF01224F),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext); // ปิด Pop-up
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('เริ่มค้นหา Jobber ในรัศมี 5 กิโลเมตร...'),
+                    backgroundColor: Color(0xFF01224F),
+                  ),
+                );
+                Navigator.pop(context); // กลับหน้าหลัก
+              },
+              child: const Text(
+                'ยอมรับและยืนยัน',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'เรียก Jobber',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ================= ส่วนที่ 1: รายละเอียดงาน =================
+              const Text(
+                'รายละเอียดงาน',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'ฉันหา',
+                style: TextStyle(fontSize: 14, color: Colors.black87),
+              ),
+              const SizedBox(height: 4),
+              TextField(
+                controller: _titleController,
+                decoration: InputDecoration(
+                  enabledBorder: _blueInputBorder,
+                  focusedBorder: _blueInputBorder,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'รายละเอียดงาน',
+                style: TextStyle(fontSize: 14, color: Colors.black87),
+              ),
+              const SizedBox(height: 4),
+              TextField(
+                controller: _descController,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  enabledBorder: _blueInputBorder,
+                  focusedBorder: _blueInputBorder,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ================= ส่วนที่ 2: สถานที่และเวลา =================
+              const Text(
+                'สถานที่และเวลา',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // แผนที่จำลองฝั่งซ้าย
+                  Container(
+                    width: 100,
+                    height: 105,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          Icons.map_outlined,
+                          size: 50,
+                          color: Colors.grey[400],
+                        ),
+                        const Icon(
+                          Icons.location_on,
+                          size: 32,
+                          color: Colors.red,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // ช่องที่อยู่ และ ช่องวัน/เวลา ฝั่งขวา
+                  Expanded(
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _addressController,
+                          style: const TextStyle(fontSize: 13),
+                          decoration: InputDecoration(
+                            enabledBorder: _blueInputBorder,
+                            focusedBorder: _blueInputBorder,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 5,
+                              child: TextField(
+                                controller: _dateController,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  enabledBorder: _blueInputBorder,
+                                  focusedBorder: _blueInputBorder,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 4.0),
+                              child: Text(
+                                '|',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 6,
+                              child: TextField(
+                                controller: _timeController,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  enabledBorder: _blueInputBorder,
+                                  focusedBorder: _blueInputBorder,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // ================= ส่วนที่ 3: ค่าจ้างและการชำระเงิน =================
+              const Text(
+                'ค่าจ้างและการชำระเงิน',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFF4AC4F3),
+                    width: 1.5,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // กล่องใส่ค่าจ้าง
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'ค่าจ้างรวม',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                height: 38,
+                                child: TextField(
+                                  controller: _priceController,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  decoration: InputDecoration(
+                                    enabledBorder: _blueInputBorder,
+                                    focusedBorder: _blueInputBorder,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+
+                        // Radio Button เลือกวิธีชำระ
+                        Expanded(
+                          flex: 6,
+                          child: Column(
+                            children: [
+                              _buildPaymentOption('เงินสดหลังจบงาน'),
+                              _buildPaymentOption('QR Code'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'เงื่อนไขการคำนวณค่าจ้าง',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              // ================= ปุ่มกดยืนยันด้านล่าง =================
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                            color: Color(0xFF4AC4F3),
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'บันทึกเป็นฉบับร่าง',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _showWarningPopup,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(
+                            0xFF01224F,
+                          ), // สีน้ำเงินเข้ม
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'เรียก Jobber ทันที!',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // วิดเจ็ตตัวเลือก Radio Button การชำระเงิน
+  Widget _buildPaymentOption(String title) {
+    return InkWell(
+      onTap: () => setState(() => _paymentMethod = title),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: Radio<String>(
+                value: title,
+                groupValue: _paymentMethod,
+                activeColor: const Color(0xFF01224F),
+                onChanged: (val) {
+                  if (val != null) setState(() => _paymentMethod = val);
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

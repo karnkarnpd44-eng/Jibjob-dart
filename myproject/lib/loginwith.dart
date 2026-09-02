@@ -1,6 +1,5 @@
-// loginwith.dart
 import 'package:flutter/material.dart';
-import 'package:myproject/logincreate1.dart';
+import 'package:myproject/condition.dart';
 
 class JibJobLoginPage extends StatelessWidget {
   const JibJobLoginPage({super.key});
@@ -35,8 +34,11 @@ class JibJobLoginPage extends StatelessWidget {
 
               const SizedBox(height: 50),
 
+              // ปุ่มเข้าสู่ระบบ
               ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  // ใส่ Logic การเข้าสู่ระบบตรงนี้
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryButtonColor,
                   minimumSize: const Size.fromHeight(buttonHeight),
@@ -52,12 +54,14 @@ class JibJobLoginPage extends StatelessWidget {
 
               const SizedBox(height: 15),
 
+              // ปุ่มสร้างบัญชี (แก้ไขให้นำทางไปหน้าเงื่อนไขก่อน)
               ElevatedButton(
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const CreateAccountPage1(),
+                      // เปลี่ยนเป็นชื่อ Class ของหน้าเงื่อนไขที่คุณสร้างไว้
+                      builder: (context) => const TermsOfServicePage(),
                     ),
                   );
                 },
@@ -90,21 +94,22 @@ class JibJobLoginPage extends StatelessWidget {
 
   Widget _buildLogoSection() {
     return Container(
-      height: 200, // ✅ กำหนดความสูงชัดเจน
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage('assets/background.jpg'),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: const Center(
-        child: Text(
-          "JIBJOB",
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+      margin: const EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: Image.asset(
+          'assets/logo2.png',
+          height: 150,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return const Text(
+              'JIBJOB',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A3766),
+              ),
+            );
+          },
         ),
       ),
     );

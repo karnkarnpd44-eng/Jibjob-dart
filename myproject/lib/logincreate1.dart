@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:myproject/logincreate2.dart'; // import หน้า 2 สำหรับปุ่ม Next
+import 'package:myproject/condition.dart';
+
 
 // import 'package:myproject/l10n/app_localizations.dart'; // ยกเลิกการคอมเมนต์เมื่อตั้งค่า l10n เสร็จสิ้น
 
