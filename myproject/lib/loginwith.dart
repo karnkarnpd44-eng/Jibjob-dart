@@ -1,6 +1,5 @@
 // loginwith.dart
 import 'package:flutter/material.dart';
-// ต้อง import ไฟล์หน้าสร้างบัญชีเพื่อให้ Navigator รู้จักคลาส CreateAccountPage1
 import 'package:myproject/logincreate1.dart';
 
 class JibJobLoginPage extends StatelessWidget {
@@ -8,7 +7,6 @@ class JibJobLoginPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // กำหนดสีหลักสำหรับปุ่ม
     final Color primaryButtonColor = const Color(0xFF1A3766);
     const double buttonHeight = 50.0;
     const double buttonRadius = 10.0;
@@ -33,16 +31,12 @@ class JibJobLoginPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              // 1. ส่วนของโลโก้
-              _buildLogoSection(context),
+              _buildLogoSection(),
 
               const SizedBox(height: 50),
 
-              // 2. ปุ่ม "เข้าสู่ระบบ"
               ElevatedButton(
-                onPressed: () {
-                  // TODO: เพิ่ม logic เข้าสู่ระบบ
-                },
+                onPressed: () {},
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryButtonColor,
                   minimumSize: const Size.fromHeight(buttonHeight),
@@ -58,10 +52,8 @@ class JibJobLoginPage extends StatelessWidget {
 
               const SizedBox(height: 15),
 
-              // 3. ปุ่ม "สร้างบัญชี" (แก้ไขจุดนี้เพื่อให้กดไปหน้า 2 ได้)
               ElevatedButton(
                 onPressed: () {
-                  // ใช้ Navigator เพื่อเปิดหน้า CreateAccountPage1
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -84,28 +76,9 @@ class JibJobLoginPage extends StatelessWidget {
 
               const SizedBox(height: 30),
 
-              // 4. ปุ่ม Social Login ต่างๆ
               _buildSocialLoginButton(
                 iconPath: 'assets/google.png',
                 text: 'เข้าสู่ระบบผ่าน Google',
-                onPressed: () {},
-              ),
-              const SizedBox(height: 15),
-              _buildSocialLoginButton(
-                iconPath: 'assets/facebook.png',
-                text: 'เข้าสู่ระบบผ่าน Facebook',
-                onPressed: () {},
-              ),
-              const SizedBox(height: 15),
-              _buildSocialLoginButton(
-                iconPath: 'assets/line.png',
-                text: 'เข้าสู่ระบบผ่าน Line',
-                onPressed: () {},
-              ),
-              const SizedBox(height: 15),
-              _buildSocialLoginButton(
-                iconPath: 'assets/thaid.png',
-                text: 'เข้าสู่ระบบผ่าน ThaID',
                 onPressed: () {},
               ),
             ],
@@ -115,29 +88,24 @@ class JibJobLoginPage extends StatelessWidget {
     );
   }
 
-  Widget _buildLogoSection(BuildContext context) {
+  Widget _buildLogoSection() {
     return Container(
-      alignment: Alignment.center,
-      height: 250,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // ป้องกัน error ถ้ายังไม่มีไฟล์รูปภาพ ให้เช็คชื่อไฟล์ assets ให้ตรงกันด้วยครับ
-          Image.asset(
-            'assets/jibjob.png',
-            height: 120,
-            errorBuilder: (context, error, stackTrace) {
-              return const Text(
-                'JibJob Logo',
-                style: TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A3766),
-                ),
-              );
-            },
+      height: 200, // ✅ กำหนดความสูงชัดเจน
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage('assets/background.jpg'),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: const Center(
+        child: Text(
+          "JIBJOB",
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -157,8 +125,8 @@ class JibJobLoginPage extends StatelessWidget {
       ),
       onPressed: onPressed,
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // ป้องกัน error ถ้าไม่มีไฟล์ไอคอน
           Image.asset(
             iconPath,
             width: 22,
