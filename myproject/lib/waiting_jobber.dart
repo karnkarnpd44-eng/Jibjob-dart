@@ -1,12 +1,58 @@
+// [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'jobber_candidates.dart';
 
-class WaitingJobberScreen extends StatelessWidget {
+class WaitingJobberScreen extends StatefulWidget {
   const WaitingJobberScreen({Key? key}) : super(key: key);
+
+  @override
+  State<WaitingJobberScreen> createState() => _WaitingJobberScreenState();
+}
+
+class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
+  // ===========================================================================
+  // [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
+  // ตัวแปรจับเวลาสำหรับจำลองรอ Jobber 10 วินาที
+  // ===========================================================================
+  Timer? _simulationTimer;
 
   final OutlineInputBorder _blueInputBorder = const OutlineInputBorder(
     borderRadius: BorderRadius.all(Radius.circular(16)),
     borderSide: BorderSide(color: Color(0xFF4AC4F3), width: 1.5),
   );
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ===========================================================================
+    // [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
+    // จำลองการรอ 10 วินาที แล้วสลับไปหน้า JobberCandidatesScreen อัตโนมัติ
+    // เมื่อต่อหลังบ้านจริง: ให้แทนที่จุดนี้ด้วย Firestore StreamSubscription หรือ FCM Listener
+    // ===========================================================================
+    _simulationTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const JobberCandidatesScreen(),
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // ===========================================================================
+    // [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
+    // ยกเลิก Timer เมื่อผู้ใช้กดออกจากหน้าจอนี้ก่อนครบ 10 วินาที
+    // ===========================================================================
+    _simulationTimer?.cancel();
+
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -122,10 +168,10 @@ class WaitingJobberScreen extends StatelessWidget {
                   children: [
                     // ช่องใส่รูปภาพการ์ตูนนั่งรอ
                     SizedBox(
-                      width: 100,
-                      height: 100,
+                      width: 150,
+                      height: 150,
                       child: Image.asset(
-                        'assets/WaitingJobber.jpg', // เปลี่ยนเป็นชื่อไฟล์รูปของคุณ
+                        'assets/WaitingJobber.jpg',
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
@@ -147,7 +193,7 @@ class WaitingJobberScreen extends StatelessWidget {
                       child: Text(
                         'ตอนนี้ยังไม่มี Jobber\nเข้ามารับงาน...',
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
                           height: 1.4,
