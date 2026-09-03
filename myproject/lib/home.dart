@@ -1,7 +1,7 @@
 // home.dart
 import 'package:flutter/material.dart';
-import 'post_job.dart';
-import 'waiting_jobber.dart';
+import 'หน้าการสร้างงาน/post_job.dart';
+import 'หน้าการสร้างงาน/waiting_jobber.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'jobber_tracking.dart';
 
 class JobberCandidatesScreen extends StatelessWidget {
   const JobberCandidatesScreen({Key? key}) : super(key: key);
@@ -227,11 +228,16 @@ class JobberCandidatesScreen extends StatelessWidget {
                               height: 32,
                               child: ElevatedButton(
                                 onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'คุณได้เลือก ${item['name']} เป็นผู้รับจ้างแล้ว',
-                                      ),
+                                  // 💡 นำทางไปหน้าสถานะ Jobber กำลังมา
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          JobberTrackingScreen(
+                                            jobberName: item['name'],
+                                            rating: item['rating'],
+                                            distance: item['distance'],
+                                          ),
                                     ),
                                   );
                                 },

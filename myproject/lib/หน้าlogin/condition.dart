@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:myproject/logincreate1.dart';
+import 'package:myproject/%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2login/logincreate1.dart';
 
 class TermsOfServicePage extends StatefulWidget {
   const TermsOfServicePage({super.key});
