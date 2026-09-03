@@ -1,6 +1,9 @@
+// [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'jobber_arrived.dart';
 
-class JobberTrackingScreen extends StatelessWidget {
+class JobberTrackingScreen extends StatefulWidget {
   final String jobberName;
   final String rating;
   final String distance;
@@ -11,6 +14,52 @@ class JobberTrackingScreen extends StatelessWidget {
     this.rating = '4.5',
     this.distance = '1.5 กม.',
   }) : super(key: key);
+
+  @override
+  State<JobberTrackingScreen> createState() => _JobberTrackingScreenState();
+}
+
+class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
+  // ===========================================================================
+  // [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
+  // ตัวแปรจับเวลาสำหรับจำลองการเดินทาง 10 วินาที
+  // ===========================================================================
+  Timer? _trackingSimulationTimer;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ===========================================================================
+    // [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
+    // จำลอง Jobber เดินทาง 10 วินาที แล้วสลับหน้าจอไปที่ JobberArrivedScreen อัตโนมัติ
+    // เมื่อต่อหลังบ้านจริง: ให้แทนที่จุดนี้ด้วย Firestore Listener ตรวจสอบสถานะงาน (status == 'jobber_arrived')
+    // ===========================================================================
+    _trackingSimulationTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => JobberArrivedScreen(
+              jobberName: widget.jobberName,
+              rating: widget.rating,
+            ),
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // ===========================================================================
+    // [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
+    // ยกเลิก Timer เมื่อผู้ใช้ออกจากหน้าจอนี้ก่อนครบ 10 วินาที
+    // ===========================================================================
+    _trackingSimulationTimer?.cancel();
+
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +79,6 @@ class JobberTrackingScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // หัวข้อด้านบน
               const Text(
                 'สถานะงาน Jobber กำลังมา...',
                 style: TextStyle(
@@ -41,18 +89,16 @@ class JobberTrackingScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // กล่องสีฟ้าอมเขียวขนาดใหญ่ครอบคลุมเนื้อหาทั้งหมด
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF65C1BF), // สีฟ้าอมเขียวตามภาพ
+                  color: const Color(0xFF65C1BF),
                   borderRadius: BorderRadius.circular(28),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ส่วนโปรไฟล์ Jobber
                     Row(
                       children: [
                         CircleAvatar(
@@ -73,7 +119,7 @@ class JobberTrackingScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              jobberName,
+                              widget.jobberName,
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -90,7 +136,7 @@ class JobberTrackingScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  rating,
+                                  widget.rating,
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
@@ -114,7 +160,6 @@ class JobberTrackingScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // เวลาที่จะถึงและระยะทาง
                     const Row(
                       children: [
                         Text(
@@ -141,7 +186,7 @@ class JobberTrackingScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: 24),
                         Text(
-                          distance,
+                          widget.distance,
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -152,7 +197,6 @@ class JobberTrackingScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // หัวข้อรายละเอียดงาน
                     const Text(
                       'รายละเอียดงาน',
                       style: TextStyle(
@@ -163,7 +207,6 @@ class JobberTrackingScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
 
-                    // การ์ดรายละเอียดงานพื้นสีขาว
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
@@ -244,25 +287,18 @@ class JobberTrackingScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // ===========================================================================
-                    // [TODO: FUTURE BACKEND & GOOGLE MAPS API]
-                    // ในอนาคตจุดนี้จะนำ GoogleMap Widget (google_maps_flutter) มาวางแทนที่
-                    // รองรับ Markers ตำแหน่งคนขับ และ Polyline เส้นทางการเดินทางแบบ Real-time
-                    // ===========================================================================
+                    // แผนที่จำลอง
                     Container(
                       height: 180,
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: const Color(
-                          0xFFF1F3F4,
-                        ), // สีพื้นหลังเลียนแบบ Google Maps
+                        color: const Color(0xFFF1F3F4),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: Colors.white, width: 2),
                       ),
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          // ไอคอนจำลองเส้นทางและหมุดพิกัด
                           Icon(
                             Icons.map_outlined,
                             size: 80,
@@ -305,7 +341,6 @@ class JobberTrackingScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
 
-                    // ปุ่มยกเลิกงาน (สีเทาจางตามภาพ)
                     SizedBox(
                       width: double.infinity,
                       height: 48,
@@ -325,9 +360,7 @@ class JobberTrackingScreen extends StatelessWidget {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(
-                            0xFFD3D7DC,
-                          ), // สีเทาตามภาพ
+                          backgroundColor: const Color(0xFFD3D7DC),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),

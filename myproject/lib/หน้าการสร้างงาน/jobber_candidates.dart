@@ -1,42 +1,161 @@
 import 'package:flutter/material.dart';
+import '../home.dart'; // ✅ ถูกต้อง
 import 'jobber_tracking.dart';
 
 class JobberCandidatesScreen extends StatelessWidget {
   const JobberCandidatesScreen({Key? key}) : super(key: key);
 
-  // ข้อมูลจำลอง Jobber ที่กดสนใจงานเข้ามา (รัศมีไม่เกิน 5 กม.)
   final List<Map<String, dynamic>> candidates = const [
     {
       'name': 'กิตติพงษ์',
       'rating': '4.5',
       'distance': '1.5 กม.',
-      'avatar': 'assets/pim1.jpg',
+      'avatar': 'assets/im1.png',
     },
     {
       'name': 'อาทิตยา',
       'rating': '4.0',
       'distance': '2.0 กม.',
-      'avatar': 'assets/pim2.jpg',
+      'avatar': 'assets/im2.png',
     },
     {
       'name': 'สมชาย',
       'rating': '4.8',
       'distance': '0.8 กม.',
-      'avatar': 'assets/pim3.jpg',
-    },
-    {
-      'name': 'วิภาดา',
-      'rating': '4.9',
-      'distance': '3.2 กม.',
-      'avatar': 'assets/pim4.jpg',
-    },
-    {
-      'name': 'ณัฐวุฒิ',
-      'rating': '4.2',
-      'distance': '4.1 กม.',
-      'avatar': 'assets/pim5.jpg',
+      'avatar': 'assets/im3.png',
     },
   ];
+
+  // Pop-up ยืนยันการยกเลิกงาน
+  void _showCancelConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFC6C6), // สีชมพูพาสเทล
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.black, width: 3.5),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'คุณต้องการยกเลิกงานจริงๆหรอ',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      height: 120,
+                      child: Image.asset(
+                        'assets/cancel_person.png', // เปลี่ยนเป็นชื่อไฟล์รูปภาพของคุณ
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.4),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.sentiment_dissatisfied,
+                              size: 60,
+                              color: Colors.black54,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const Spacer(),
+                    SizedBox(
+                      width: 78,
+                      height: 38,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext); // ปิด Dialog
+                          // ล้าง Stack แล้วย้อนกลับไปหน้าแรก HomeScreen
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HomeScreen(),
+                            ),
+                            (route) => false,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('ยกเลิกงานเรียบร้อยแล้ว'),
+                              backgroundColor: Colors.black87,
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF3B30),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'ใช่',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 78,
+                      height: 38,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF99E22B),
+                          foregroundColor: Colors.black87,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'ไม่ใช่',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +175,6 @@ class JobberCandidatesScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ชื่องาน
               const Text(
                 'พาหมาไปเดินเล่น',
                 style: TextStyle(
@@ -67,7 +185,6 @@ class JobberCandidatesScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
 
-              // การ์ดข้อมูลงานด้านบน
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -78,15 +195,15 @@ class JobberCandidatesScreen extends StatelessWidget {
                     width: 1.5,
                   ),
                 ),
-                child: Column(
+                child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       '12 พ.ย. 2568   16:30 - 17:30',
                       style: TextStyle(fontSize: 14, color: Colors.black87),
                     ),
-                    const SizedBox(height: 6),
-                    const Row(
+                    SizedBox(height: 6),
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(Icons.location_on, color: Colors.red, size: 20),
@@ -102,8 +219,8 @@ class JobberCandidatesScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    const Row(
+                    SizedBox(height: 6),
+                    Row(
                       children: [
                         Icon(
                           Icons.payments_outlined,
@@ -112,13 +229,13 @@ class JobberCandidatesScreen extends StatelessWidget {
                         ),
                         SizedBox(width: 6),
                         Text(
-                          '100 บาท',
+                          '300 บาท',
                           style: TextStyle(fontSize: 14, color: Colors.black87),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    const Row(
+                    SizedBox(height: 6),
+                    Row(
                       children: [
                         Icon(
                           Icons.access_time,
@@ -141,9 +258,9 @@ class JobberCandidatesScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // กล่องรายการ Jobber ที่สามารถเลื่อน Scroll ดูได้
+              // กล่องรายการ Jobber ที่สามารถเลื่อนได้
               Container(
-                height: 220, // ปรับความสูงของรายการเลื่อน
+                height: 220,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.black26, width: 1.2),
@@ -167,7 +284,6 @@ class JobberCandidatesScreen extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            // รูป Avatar Jobber
                             CircleAvatar(
                               radius: 26,
                               backgroundColor: Colors.grey[200],
@@ -178,8 +294,6 @@ class JobberCandidatesScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 14),
-
-                            // ข้อมูลชื่อ คะแนน ระยะทาง
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,13 +336,10 @@ class JobberCandidatesScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
-
-                            // ปุ่มเลือกสีเขียวสด
                             SizedBox(
                               height: 32,
                               child: ElevatedButton(
                                 onPressed: () {
-                                  // 💡 นำทางไปหน้าสถานะ Jobber กำลังมา
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -270,7 +381,6 @@ class JobberCandidatesScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // ปุ่มต่อเวลาเปิดรับงาน
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -300,12 +410,12 @@ class JobberCandidatesScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // ปุ่มยกเลิกงาน (สีแดงส้ม)
+              // ปุ่มยกเลิกงาน (เรียก Pop-up)
               SizedBox(
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton.icon(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => _showCancelConfirmationDialog(context),
                   icon: const Icon(Icons.cancel, color: Color(0xFF006666)),
                   label: const Text(
                     'ยกเลิกงาน',
@@ -325,7 +435,6 @@ class JobberCandidatesScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
 
-              // แถบแจ้งเตือนด้านล่าง
               const Divider(thickness: 1, color: Colors.black26),
               const SizedBox(height: 8),
               const Row(

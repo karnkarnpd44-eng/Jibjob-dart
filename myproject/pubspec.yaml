@@ -73,6 +73,8 @@ flutter:
     - assets/pim1.jpg
     - assets/pim2.jpg
     - assets/pim3.jpg
+    - assets/jobber_arrived.png
+    - assets/cancel_person.png
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
