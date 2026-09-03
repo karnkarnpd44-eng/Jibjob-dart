@@ -1,6 +1,7 @@
 // home.dart
 import 'package:flutter/material.dart';
 import 'post_job.dart';
+import 'waiting_jobber.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -200,7 +201,10 @@ class _HomeScreenState extends State<HomeScreen> {
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const Placeholder()),
+              MaterialPageRoute(
+                builder: (context) =>
+                    const WaitingJobberScreen(), // ✅ หน้า Waiting Jobber
+              ),
             );
           },
           style: ElevatedButton.styleFrom(

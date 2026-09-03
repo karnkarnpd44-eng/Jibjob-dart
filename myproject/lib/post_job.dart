@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'waiting_jobber.dart';
 
 class PostJobScreen extends StatefulWidget {
   const PostJobScreen({Key? key}) : super(key: key);
@@ -123,7 +124,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                               Text(
                                 'การแจ้งเตือน',
                                 style: TextStyle(
-                                  fontSize: 22,
+                                  fontSize: 30,
                                   fontWeight: FontWeight.w900,
                                   color: Colors.black,
                                 ),
@@ -132,7 +133,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                               Text(
                                 'ความเสี่ยง!',
                                 style: TextStyle(
-                                  fontSize: 22,
+                                  fontSize: 30,
                                   fontWeight: FontWeight.w900,
                                   color: Colors.black,
                                 ),
@@ -150,11 +151,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       'หรือสถานที่จำกัดการเข้าถึง\n'
                       'โปรดพิจารณารายละเอียดงานและข้อตกลง\n'
                       'ระหว่างกันอย่างรอบคอบ\n'
-                      'JibJobทำหน้าที่เป็นแพลตฟอร์มตัวกลาง\n'
+                      'JibJob ทำหน้าที่เป็นแพลตฟอร์มตัวกลาง\n'
                       'เท่านั้นมิได้เป็นผู้รับรองความปลอดภัย\n'
                       'ของงาน',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 16,
                         color: Colors.black,
                         fontWeight: FontWeight.w600,
                         height: 1.35,
@@ -200,17 +201,16 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           child: SizedBox(
                             height: 44,
                             child: ElevatedButton(
+                              // ปุ่มเข้าใจแล้ว
                               onPressed: () {
                                 Navigator.pop(dialogContext); // ปิด Dialog
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'บันทึกงานสำเร็จ เริ่มค้นหาผู้รับจ้างในรัศมี 5กิโลเมตร...',
-                                    ),
-                                    backgroundColor: Color(0xFF01224F),
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const WaitingJobberScreen(),
                                   ),
                                 );
-                                Navigator.pop(context); // ย้อนกลับหน้าแรก
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(
