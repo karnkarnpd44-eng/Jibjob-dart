@@ -48,63 +48,237 @@ class _PostJobScreenState extends State<PostJobScreen> {
   }
 
   // Warning Pop-up แจ้งเตือนข้อตกลงเรื่องความเสี่ยงตามบทที่ 1 และ 3
+  // Warning Pop-up แจ้งเตือนข้อตกลงเรื่องความเสี่ยง
   void _showWarningPopup() {
+    bool doNotShowAgain = false;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 26),
-              SizedBox(width: 8),
-              Text(
-                'ข้อตกลงเรื่องความเสี่ยง',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          content: const SingleChildScrollView(
-            child: Text(
-              'โปรดรับทราบเงื่อนไขความเสี่ยงในการจ้างงาน:\n\n'
-              '1. แพลตฟอร์ม JibJob เป็นเพียงสื่อกลางในการเชื่อมโยงระหว่างผู้ว่าจ้างและผู้รับจ้าง\n'
-              '2. การชำระเงินค่าตอบแทนเป็นการตกลงโดยตรงระหว่างผู้ใช้ผ่านเงินสดหรือ QR Code ส่วนตัว\n'
-              '3. แพลตฟอร์มไม่มีส่วนรับผิดชอบต่อความเสียหายของทรัพย์สิน หรือข้อพิพาททางการเงิน\n'
-              '4. โปรดตรวจสอบรายละเอียดและดูแลทรัพย์สินของท่านอย่างรอบคอบ',
-              style: TextStyle(fontSize: 14, height: 1.4),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF01224F),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFBB040), // สีพื้นหลังส้มอมเหลืองตามภาพ
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.black,
+                    width: 3.5,
+                  ), // ขอบสีดำหนา
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 10,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- แถบส่วนหัว: รูปภาพและข้อความหัวข้อ ---
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // 💡 ช่องใส่รูปภาพตามขนาดและระยะในภาพ
+                        SizedBox(
+                          width: 110,
+                          height: 110,
+                          child: Image.asset(
+                            'assets/Warning.png', // <-- ใส่ Path รูปภาพของคุณตรงนี้
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              // แสดงกล่องจำลองระหว่างที่ยังไม่ได้ใส่ไฟล์รูป
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.black26,
+                                    strokeAlign: BorderSide.strokeAlignInside,
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.image,
+                                    size: 40,
+                                    color: Colors.black38,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'การแจ้งเตือน',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'ความเสี่ยง!',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // --- เนื้อหารายละเอียดข้อความแจ้งเตือน ---
+                    const Text(
+                      'งานบางประเภทอาจเกี่ยวข้องกับพื้นที่ส่วนตัว\n'
+                      'หรือสถานที่จำกัดการเข้าถึง\n'
+                      'โปรดพิจารณารายละเอียดงานและข้อตกลง\n'
+                      'ระหว่างกันอย่างรอบคอบ\n'
+                      'JibJobทำหน้าที่เป็นแพลตฟอร์มตัวกลาง\n'
+                      'เท่านั้นมิได้เป็นผู้รับรองความปลอดภัย\n'
+                      'ของงาน',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+
+                    // --- ปุ่มยกเลิก และ เข้าใจแล้ว ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // ปุ่มยกเลิก (สีแดง)
+                        Expanded(
+                          child: SizedBox(
+                            height: 44,
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.pop(dialogContext),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(
+                                  0xFFFF4D4D,
+                                ), // สีแดงอมส้ม
+                                foregroundColor: Colors.black,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'ยกเลิก',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+
+                        // ปุ่มเข้าใจแล้ว (สีเขียวตองอ่อน)
+                        Expanded(
+                          child: SizedBox(
+                            height: 44,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(dialogContext); // ปิด Dialog
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'บันทึกงานสำเร็จ เริ่มค้นหาผู้รับจ้างในรัศมี 5กิโลเมตร...',
+                                    ),
+                                    backgroundColor: Color(0xFF01224F),
+                                  ),
+                                );
+                                Navigator.pop(context); // ย้อนกลับหน้าแรก
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(
+                                  0xFF99E22B,
+                                ), // สีเขียวตองอ่อน
+                                foregroundColor: Colors.black,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'เข้าใจแล้ว',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // --- Checkbox: วันนี้ไม่แสดงหน้านี้อีก ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            setDialogState(() {
+                              doNotShowAgain = !doNotShowAgain;
+                            });
+                          },
+                          child: Container(
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: doNotShowAgain
+                                ? const Icon(
+                                    Icons.check,
+                                    size: 16,
+                                    color: Colors.black,
+                                  )
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'วันนี้ไม่แสดงหน้านี้อีก',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              onPressed: () {
-                Navigator.pop(dialogContext); // ปิด Pop-up
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('เริ่มค้นหา Jobber ในรัศมี 5 กิโลเมตร...'),
-                    backgroundColor: Color(0xFF01224F),
-                  ),
-                );
-                Navigator.pop(context); // กลับหน้าหลัก
-              },
-              child: const Text(
-                'ยอมรับและยืนยัน',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
+            );
+          },
         );
       },
     );
