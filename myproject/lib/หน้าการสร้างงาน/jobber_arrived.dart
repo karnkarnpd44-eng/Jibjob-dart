@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'jobber_working.dart';
+import '../หน้าข้อความ/chat_list.dart';
 
 class JobberArrivedScreen extends StatelessWidget {
   final String jobberName;
@@ -154,6 +156,12 @@ class JobberArrivedScreen extends StatelessWidget {
                       height: 48,
                       child: ElevatedButton(
                         onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ChatListScreen(),
+                            ),
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('เปิดหน้าต่างข้อความแชท...'),
@@ -191,6 +199,12 @@ class JobberArrivedScreen extends StatelessWidget {
                       height: 48,
                       child: ElevatedButton(
                         onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const JobberWorkingScreen(),
+                            ),
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('ยืนยันเริ่มปฏิบัติงานแล้ว'),

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'หน้าการสร้างงาน/post_job.dart';
 import 'หน้าการสร้างงาน/waiting_jobber.dart';
+import 'หน้าข้อความ/chat_list.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -202,8 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) =>
-                    const WaitingJobberScreen(), // ✅ หน้า Waiting Jobber
+                builder: (context) => const WaitingJobberScreen(),
               ),
             );
           },
@@ -315,8 +315,18 @@ class _HomeScreenState extends State<HomeScreen> {
           // งานของฉัน
           _buildNavItem(icon: Icons.work, label: 'งานของฉัน'),
 
-          // ข้อความ (มี Badge สีแดง)
-          _buildNavItem(icon: Icons.chat, label: 'ข้อความ', hasBadge: true),
+          // ข้อความ (มี Badge สีแดง เชื่อมไปยัง ChatListScreen)
+          _buildNavItem(
+            icon: Icons.chat,
+            label: 'ข้อความ',
+            hasBadge: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ChatListScreen()),
+              );
+            },
+          ),
 
           // โปรไฟล์
           _buildNavItem(icon: Icons.account_circle, label: 'โปรไฟล์'),
@@ -329,9 +339,10 @@ class _HomeScreenState extends State<HomeScreen> {
     required IconData icon,
     required String label,
     bool hasBadge = false,
+    VoidCallback? onTap,
   }) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
