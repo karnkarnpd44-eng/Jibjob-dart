@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../home.dart';
 import '../หน้าข้อความ/chat_list.dart';
 import '../หน้าการสร้างงาน/jobber_arrived.dart';
+import '../หน้างานของฉัน/my_jobs.dart';
+import '../หน้าโปรไฟล์ผู้จ้าง/profile.dart';
 
 class NotificationListScreen extends StatefulWidget {
   // รับข้อมูล Jobber และข้อมูลงานจริงที่เกี่ยวข้อง
@@ -311,7 +313,22 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
               ],
             ),
           ),
-          _buildNavItem(icon: Icons.work, label: 'งานของฉัน'),
+          _buildNavItem(
+            icon: Icons.work,
+            label: 'งานของฉัน',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MyJobsScreen(
+                    activeJobTitle: widget.jobTitle,
+                    activeJobDate: widget.jobDate,
+                  ),
+                ),
+              );
+            },
+          ),
+
           _buildNavItem(
             icon: Icons.chat,
             label: 'ข้อความ',
@@ -323,7 +340,16 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
               );
             },
           ),
-          _buildNavItem(icon: Icons.account_circle, label: 'โปรไฟล์'),
+          _buildNavItem(
+            icon: Icons.account_circle,
+            label: 'โปรไฟล์',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
+          ),
         ],
       ),
     );

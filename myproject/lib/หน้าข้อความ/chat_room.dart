@@ -1,14 +1,18 @@
+// lib/หน้าข้อความ/chat_room.dart
 import 'package:flutter/material.dart';
+import 'chat_list.dart';
 
 class ChatRoomScreen extends StatefulWidget {
-  // ===========================================================================
-  // [BACKEND HOOKS]
-  // รับข้อมูลคู่สนทนาจริงมาจากหน้าที่เรียก เพื่อความต่อเนื่องของข้อมูล
-  // ในอนาคตสามารถเพิ่ม: final String chatId; final String currentUserId;
-  // ===========================================================================
   final String jobberName;
+  final String initialMessage;
+  final String initialTime;
 
-  const ChatRoomScreen({Key? key, required this.jobberName}) : super(key: key);
+  const ChatRoomScreen({
+    Key? key,
+    this.jobberName = 'Jobber',
+    this.initialMessage = 'กำลังไปครับ!',
+    this.initialTime = 'เมื่อสักครู่',
+  }) : super(key: key);
 
   @override
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
@@ -18,30 +22,57 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  // ===========================================================================
-  // [MOCKUP DATA - พร้อมแทนที่ด้วย Firestore StreamBuilder ในอนาคต]
-  // โครงสร้างตรงตามคอลเลกชัน Chats: sender, text, timestamp, type
-  // ===========================================================================
-  final List<Map<String, dynamic>> _messages = [
-    {'sender': 'jobber', 'text': 'กำลังไปครับ!', 'time': '16:35'},
-  ];
+  late List<Map<String, dynamic>> _messages;
 
-  // ฟังก์ชันจำลองการส่งข้อความ
+  @override
+  void initState() {
+    super.initState();
+    // 💡 ดึงข้อความจริงและเวลาจริงของ Jobber คนที่กดเข้ามา
+    _messages = [
+      {
+        'sender': 'jobber',
+        'text': widget.initialMessage,
+        'time': widget.initialTime,
+      },
+    ];
+  }
+
+  String _getCurrentTimeString() {
+    final now = DateTime.now();
+    final hour = now.hour.toString().padLeft(2, '0');
+    final minute = now.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
   void _sendMessage() {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
+    final currentTime = _getCurrentTimeString();
+
     setState(() {
-      _messages.add({
-        'sender': 'user', // ผู้ว่าจ้าง (Jibber) เป็นคนส่ง
-        'text': text,
-        'time': '16:36',
-      });
+      _messages.add({'sender': 'user', 'text': text, 'time': currentTime});
     });
 
     _messageController.clear();
+    _scrollToBottom();
 
-    // เลื่อนหน้าจอลงล่างสุดอัตโนมัติเมื่อมีข้อความใหม่
+    // จำลอง Jobber พิมพ์ตอบกลับอัตโนมัติ
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _messages.add({
+            'sender': 'jobber',
+            'text': 'รับทราบครับ! เดี๋ยวรีบจัดการให้ครับ 👍',
+            'time': _getCurrentTimeString(),
+          });
+        });
+        _scrollToBottom();
+      }
+    });
+  }
+
+  void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -51,16 +82,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         );
       }
     });
-
-    // ===========================================================================
-    // [TODO: FUTURE BACKEND]
-    // FirebaseFirestore.instance.collection('chats').doc(widget.chatId)
-    //   .collection('messages').add({
-    //     'sender_id': currentUserId,
-    //     'text': text,
-    //     'created_at': FieldValue.serverTimestamp(),
-    //   });
-    // ===========================================================================
   }
 
   @override
@@ -79,7 +100,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         elevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const ChatListScreen()),
+            );
+          },
         ),
         titleSpacing: 0,
         title: Row(
@@ -91,8 +117,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
             const SizedBox(width: 10),
             Text(
-              widget
-                  .jobberName, // 💡 แสดงชื่อ Jobber ที่ส่งมาจากหน้าที่แล้วจริง
+              widget.jobberName,
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -105,7 +130,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // พื้นที่แสดงประวัติข้อความแชท
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
@@ -145,19 +169,33 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                               vertical: 10,
                             ),
                             decoration: BoxDecoration(
-                              // ฝั่ง Jobber เป็นสีกรมท่าเข้มตามภาพ Mockup, ฝั่งผู้ใช้เป็นสีฟ้าอ่อน
                               color: isUser
                                   ? const Color(0xFF4AC4F3)
                                   : const Color(0xFF022B52),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Text(
-                              msg['text'],
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: isUser
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  msg['text'] ?? '',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  msg['time'] ?? '',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -168,7 +206,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               ),
             ),
 
-            // แถบกรอกข้อความและปุ่มถ่ายรูปด้านล่าง
+            // แถบส่งข้อความด้านล่าง
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Container(
@@ -181,7 +219,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 ),
                 child: Row(
                   children: [
-                    // ปุ่มรูปกล้อง (เตรียมไว้ต่อ Image Picker / Firebase Storage)
                     IconButton(
                       icon: const Icon(
                         Icons.camera_alt_outlined,
@@ -211,7 +248,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                         onSubmitted: (_) => _sendMessage(),
                       ),
                     ),
-                    // ปุ่มไอคอนส่งข้อความสีดำ
                     IconButton(
                       icon: const Icon(
                         Icons.send,

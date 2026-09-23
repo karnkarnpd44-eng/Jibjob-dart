@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../home.dart';
 import 'chat_room.dart'; // import หน้าห้องแชท
+import '../หน้าแจ้งเตือน/notification_list.dart';
+import '../หน้างานของฉัน/my_jobs.dart';
+import '../หน้าโปรไฟล์ผู้จ้าง/profile.dart';
 
 class ChatListScreen extends StatefulWidget {
   final String jobberName;
@@ -13,12 +16,24 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  final List<Map<String, dynamic>> _mockChats = [
+  final List<Map<String, dynamic>> _chats = [
     {
       'name': 'กิตติพงษ์',
-      'last_message': 'กำลังไปครับ! เมื่อสักครู่',
-      'unread': true,
-      'avatar': 'assets/im1.png',
+      'lastMessage': 'กำลังไปครับ!',
+      'time': 'เมื่อสักครู่',
+      'avatar': null,
+    },
+    {
+      'name': 'สมชาย สายลุย',
+      'lastMessage': 'ถึงแล้วครับ รออยู่หน้าหมู่บ้าน',
+      'time': '12:30',
+      'avatar': null,
+    },
+    {
+      'name': 'วิภาดา รักสัตว์',
+      'lastMessage': 'น้องหมาเรียบร้อยดีแล้วนะคะ ขอบคุณค่ะ',
+      'time': 'เมื่อวาน',
+      'avatar': null,
     },
   ];
 
@@ -45,70 +60,98 @@ class _ChatListScreenState extends State<ChatListScreen> {
       body: SafeArea(
         child: ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          itemCount: _mockChats.length,
+          itemCount: _chats.length,
           itemBuilder: (context, index) {
-            final chat = _mockChats[index];
+            final chat = _chats[index];
 
-            // 💡 นำ InkWell มาครอบกล่อง Container ตรงนี้
-            return InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        ChatRoomScreen(jobberName: chat['name']),
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: const Color(0xFF4AC4F3),
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Colors.grey[200],
-                      child: const Icon(
-                        Icons.person,
-                        size: 40,
-                        color: Colors.grey,
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF4AC4F3), width: 1.5),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatRoomScreen(
+                        jobberName: chat['name']?.toString() ?? 'Jobber',
+                        initialMessage:
+                            chat['lastMessage']?.toString() ?? 'สวัสดีครับ',
+                        initialTime: chat['time']?.toString() ?? 'เมื่อสักครู่',
                       ),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            chat['name'],
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFF0F4C81),
+                            width: 1.8,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            chat['last_message'],
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.black87,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                        ),
+                        child: CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Colors.grey[200],
+                          backgroundImage: chat['avatar'] != null
+                              ? AssetImage(chat['avatar'].toString())
+                              : null,
+                          child: chat['avatar'] == null
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 38,
+                                  color: Colors.grey,
+                                )
+                              : null,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              chat['name']?.toString() ?? '',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text(
+                                  chat['lastMessage']?.toString() ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  chat['time']?.toString() ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black45,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -141,8 +184,25 @@ class _ChatListScreenState extends State<ChatListScreen> {
             icon: Icons.notifications,
             label: 'แจ้งเตือน',
             hasBadge: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NotificationListScreen(),
+                ),
+              );
+            },
           ),
-          _buildNavItem(icon: Icons.work, label: 'งานของฉัน'),
+          _buildNavItem(
+            icon: Icons.work,
+            label: 'งานของฉัน',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const MyJobsScreen()),
+              );
+            },
+          ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
@@ -164,7 +224,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ],
             ),
           ),
-          _buildNavItem(icon: Icons.account_circle, label: 'โปรไฟล์'),
+          _buildNavItem(
+            icon: Icons.account_circle,
+            label: 'โปรไฟล์',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
+          ),
         ],
       ),
     );

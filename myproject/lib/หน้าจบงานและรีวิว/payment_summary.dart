@@ -1,6 +1,7 @@
 // lib/หน้าการสร้างงาน/payment_summary.dart
 import 'package:flutter/material.dart';
 import '../home.dart';
+import '../หน้างานของฉัน/my_jobs.dart';
 
 class PaymentSummaryScreen extends StatefulWidget {
   // รับข้อมูลจริงของงานมาจากขั้นตอนก่อนหน้า
@@ -295,7 +296,12 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
                           Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const HomeScreen(),
+                              builder: (context) => MyJobsScreen(
+                                activeJobTitle: widget.jobTitle,
+                                activeJobDate: widget.jobDate,
+                                initialTab:
+                                    'completed', // ✅ สั่งเปิดไปที่แท็บ "สำเร็จแล้ว" ทันที
+                              ),
                             ),
                             (route) => false,
                           );

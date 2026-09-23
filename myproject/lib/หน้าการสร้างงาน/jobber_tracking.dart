@@ -40,11 +40,7 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
   void initState() {
     super.initState();
 
-    // ===========================================================================
-    // [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
-    // จำลอง Jobber เดินทาง 10 วินาที แล้วสลับหน้าจอไปที่ JobberArrivedScreen อัตโนมัติ
-    // พร้อมส่งต่อข้อมูลจริงทั้งหมด
-    // ===========================================================================
+    // จำลอง Jobber เดินทาง 10 วินาที แล้วเปิดหน้า JobberArrivedScreen
     _trackingSimulationTimer = Timer(const Duration(seconds: 10), () {
       if (mounted) {
         Navigator.pushReplacement(
@@ -227,7 +223,6 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ชื่องานจริง
                           Text(
                             widget.jobTitle,
                             style: const TextStyle(
@@ -237,7 +232,6 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          // วันที่และช่วงเวลาทำงานจริง
                           Text(
                             '${widget.jobDate}   ${widget.workTimeRange}',
                             style: const TextStyle(
@@ -284,25 +278,7 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
-                          const Row(
-                            children: [
-                              Icon(
-                                Icons.access_time,
-                                color: Color(0xFF4AC4F3),
-                                size: 18,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'รอ Jobber ตอบรับ (เหลือเวลา 45 นาที)',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
+                          // 💡 เอาแถว "รอ Jobber ตอบรับ" ออกเรียบร้อยแล้ว
                         ],
                       ),
                     ),
