@@ -1,3 +1,4 @@
+// lib/หน้าการสร้างงาน/post_job.dart
 import 'package:flutter/material.dart';
 import 'waiting_jobber.dart';
 
@@ -28,7 +29,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
     text: '100 บาท',
   );
 
-  // ตัวเลือกการชำระเงินตามเอกสาร: เงินสด หรือ QR Code ส่วนตัว
+  // ตัวเลือกการชำระเงิน
   String _paymentMethod = 'QR Code';
 
   // สไตล์กรอบ Input สีฟ้าขอบมนตาม Mockup
@@ -48,7 +49,15 @@ class _PostJobScreenState extends State<PostJobScreen> {
     super.dispose();
   }
 
-  // Warning Pop-up แจ้งเตือนข้อตกลงเรื่องความเสี่ยงตามบทที่ 1 และ 3
+  // ฟังก์ชันแปลงข้อความราคาเป็นตัวเลข double อย่างปลอดภัย
+  double _parseWageAmount() {
+    final cleanedPrice = _priceController.text.replaceAll(
+      RegExp(r'[^0-9.]'),
+      '',
+    );
+    return double.tryParse(cleanedPrice) ?? 100.0;
+  }
+
   // Warning Pop-up แจ้งเตือนข้อตกลงเรื่องความเสี่ยง
   void _showWarningPopup() {
     bool doNotShowAgain = false;
@@ -65,12 +74,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
               child: Container(
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFBB040), // สีพื้นหลังส้มอมเหลืองตามภาพ
+                  color: const Color(0xFFFBB040),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.black,
-                    width: 3.5,
-                  ), // ขอบสีดำหนา
+                  border: Border.all(color: Colors.black, width: 3.5),
                   boxShadow: const [
                     BoxShadow(
                       color: Colors.black26,
@@ -83,19 +89,16 @@ class _PostJobScreenState extends State<PostJobScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- แถบส่วนหัว: รูปภาพและข้อความหัวข้อ ---
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // 💡 ช่องใส่รูปภาพตามขนาดและระยะในภาพ
                         SizedBox(
                           width: 110,
                           height: 110,
                           child: Image.asset(
-                            'assets/Warning.png', // <-- ใส่ Path รูปภาพของคุณตรงนี้
+                            'assets/Warning.png',
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) {
-                              // แสดงกล่องจำลองระหว่างที่ยังไม่ได้ใส่ไฟล์รูป
                               return Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.3),
@@ -144,8 +147,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       ],
                     ),
                     const SizedBox(height: 18),
-
-                    // --- เนื้อหารายละเอียดข้อความแจ้งเตือน ---
                     const Text(
                       'งานบางประเภทอาจเกี่ยวข้องกับพื้นที่ส่วนตัว\n'
                       'หรือสถานที่จำกัดการเข้าถึง\n'
@@ -162,21 +163,16 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-
-                    // --- ปุ่มยกเลิก และ เข้าใจแล้ว ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // ปุ่มยกเลิก (สีแดง)
                         Expanded(
                           child: SizedBox(
                             height: 44,
                             child: ElevatedButton(
                               onPressed: () => Navigator.pop(dialogContext),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(
-                                  0xFFFF4D4D,
-                                ), // สีแดงอมส้ม
+                                backgroundColor: const Color(0xFFFF4D4D),
                                 foregroundColor: Colors.black,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
@@ -195,27 +191,49 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           ),
                         ),
                         const SizedBox(width: 16),
-
-                        // ปุ่มเข้าใจแล้ว (สีเขียวตองอ่อน)
                         Expanded(
                           child: SizedBox(
                             height: 44,
                             child: ElevatedButton(
-                              // ปุ่มเข้าใจแล้ว
                               onPressed: () {
                                 Navigator.pop(dialogContext); // ปิด Dialog
+                                // แนบข้อมูลจริงที่กรอกจากฟอร์มส่งต่อไปยัง WaitingJobberScreen
                                 Navigator.pushReplacement(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        const WaitingJobberScreen(),
+                                    builder: (context) => WaitingJobberScreen(
+                                      jobTitle:
+                                          _titleController.text
+                                              .trim()
+                                              .isNotEmpty
+                                          ? _titleController.text.trim()
+                                          : 'ไม่มีระบุชื่องาน',
+                                      jobDesc:
+                                          _descController.text.trim().isNotEmpty
+                                          ? _descController.text.trim()
+                                          : 'ไม่มีรายละเอียดเพิ่มเติม',
+                                      jobAddress:
+                                          _addressController.text
+                                              .trim()
+                                              .isNotEmpty
+                                          ? _addressController.text.trim()
+                                          : 'พิกัดงานที่ระบุ',
+                                      jobDate:
+                                          _dateController.text.trim().isNotEmpty
+                                          ? _dateController.text.trim()
+                                          : '12/11/2568',
+                                      workTimeRange:
+                                          _timeController.text.trim().isNotEmpty
+                                          ? _timeController.text.trim()
+                                          : '16:30-17:30',
+                                      wageAmount: _parseWageAmount(),
+                                      feeAmount: 0.0,
+                                    ),
                                   ),
                                 );
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(
-                                  0xFF99E22B,
-                                ), // สีเขียวตองอ่อน
+                                backgroundColor: const Color(0xFF99E22B),
                                 foregroundColor: Colors.black,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
@@ -236,8 +254,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-
-                    // --- Checkbox: วันนี้ไม่แสดงหน้านี้อีก ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -312,7 +328,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ================= ส่วนที่ 1: รายละเอียดงาน =================
               const Text(
                 'รายละเอียดงาน',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -354,7 +369,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
               ),
               const SizedBox(height: 20),
 
-              // ================= ส่วนที่ 2: สถานที่และเวลา =================
               const Text(
                 'สถานที่และเวลา',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -363,7 +377,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // แผนที่จำลองฝั่งซ้าย
                   Container(
                     width: 100,
                     height: 105,
@@ -389,8 +402,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-
-                  // ช่องที่อยู่ และ ช่องวัน/เวลา ฝั่งขวา
                   Expanded(
                     child: Column(
                       children: [
@@ -458,7 +469,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
               ),
               const SizedBox(height: 20),
 
-              // ================= ส่วนที่ 3: ค่าจ้างและการชำระเงิน =================
               const Text(
                 'ค่าจ้างและการชำระเงิน',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -478,7 +488,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // กล่องใส่ค่าจ้าง
                         Expanded(
                           flex: 4,
                           child: Column(
@@ -512,8 +521,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           ),
                         ),
                         const SizedBox(width: 16),
-
-                        // Radio Button เลือกวิธีชำระ
                         Expanded(
                           flex: 6,
                           child: Column(
@@ -539,7 +546,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
               ),
               const SizedBox(height: 30),
 
-              // ================= ปุ่มกดยืนยันด้านล่าง =================
               Row(
                 children: [
                   Expanded(
@@ -574,9 +580,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       child: ElevatedButton(
                         onPressed: _showWarningPopup,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(
-                            0xFF01224F,
-                          ), // สีน้ำเงินเข้ม
+                          backgroundColor: const Color(0xFF01224F),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -602,7 +606,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
     );
   }
 
-  // วิดเจ็ตตัวเลือก Radio Button การชำระเงิน
   Widget _buildPaymentOption(String title) {
     return InkWell(
       onTap: () => setState(() => _paymentMethod = title),

@@ -1,15 +1,27 @@
+// lib/หน้าการสร้างงาน/jobber_arrived.dart
 import 'package:flutter/material.dart';
+import '../หน้าข้อความ/chat_room.dart';
 import 'jobber_working.dart';
-import '../หน้าข้อความ/chat_list.dart';
 
 class JobberArrivedScreen extends StatelessWidget {
+  // บังคับรับค่าจริงทุกตัว ไม่ใช้ค่าคงที่ Default อีกต่อไป
   final String jobberName;
   final String rating;
+  final String jobTitle;
+  final String jobDate;
+  final String workTimeRange;
+  final double wageAmount;
+  final double feeAmount;
 
   const JobberArrivedScreen({
     Key? key,
-    this.jobberName = 'กิตติพงษ์',
-    this.rating = '4.5',
+    required this.jobberName,
+    required this.rating,
+    required this.jobTitle,
+    required this.jobDate,
+    required this.workTimeRange,
+    required this.wageAmount,
+    required this.feeAmount,
   }) : super(key: key);
 
   @override
@@ -20,7 +32,7 @@ class JobberArrivedScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -30,28 +42,27 @@ class JobberArrivedScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // หัวข้อด้านบน
               const Text(
                 'Jobber ถึงแล้ว!',
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
-                  color: Colors.black,
+                  color: Colors.black87,
                 ),
               ),
               const SizedBox(height: 16),
 
-              // การ์ดหลักสีฟ้าอมเขียวขนาดใหญ่
+              // การ์ดแสดงสถานะ Jobber ถึงจุดนัดหมายแล้ว
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF65C1BF), // สีฟ้าอมเขียวตาม Mockup
+                  color: const Color(0xFF65C1BF),
                   borderRadius: BorderRadius.circular(32),
                 ),
                 child: Column(
                   children: [
-                    // ข้อมูลโปรไฟล์ Jobber
+                    // ส่วนหัวการ์ด: แสดงรูปโปรไฟล์ ชื่อ และคะแนนรีวิว
                     Row(
                       children: [
                         CircleAvatar(
@@ -72,7 +83,7 @@ class JobberArrivedScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              jobberName,
+                              jobberName, // 💡 แสดงชื่อคนที่เลือกไว้จริง
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -89,7 +100,7 @@ class JobberArrivedScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  rating,
+                                  rating, // 💡 แสดงคะแนนรีวิวที่ส่งต่อมา
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
@@ -113,7 +124,7 @@ class JobberArrivedScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 28),
 
-                    // ข้อความแจ้งเตือนจุดนัดหมาย
+                    // ข้อความแจ้งเตือนสถานะ
                     const Text(
                       'Jobber ถึงจุดนัดหมายแล้ว!',
                       style: TextStyle(
@@ -124,24 +135,24 @@ class JobberArrivedScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
 
-                    // ช่องใส่รูปภาพการ์ตูนนัดพบกัน
+                    // ภาพประกอบ Jobber ขี่มอเตอร์ไซค์
                     SizedBox(
                       height: 200,
                       width: double.infinity,
                       child: Image.asset(
-                        'assets/jobber_arrived.png', // เปลี่ยนเป็นชื่อไฟล์รูปภาพของคุณ
+                        'assets/jobber_arrived.png',
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.3),
+                              color: Colors.white.withOpacity(0.25),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: const Center(
                               child: Icon(
                                 Icons.two_wheeler,
                                 size: 80,
-                                color: Colors.black38,
+                                color: Colors.white70,
                               ),
                             ),
                           );
@@ -150,7 +161,7 @@ class JobberArrivedScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 36),
 
-                    // ปุ่มไปที่แชทเพื่อตรวจสอบ (สีเขียวตองอ่อน)
+                    // ปุ่มที่ 1: ไปที่แชทเพื่อตรวจสอบ (เปิดห้องแชทของ Jobber คนนี้ทันที)
                     SizedBox(
                       width: double.infinity,
                       height: 48,
@@ -159,25 +170,19 @@ class JobberArrivedScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const ChatListScreen(),
-                            ),
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('เปิดหน้าต่างข้อความแชท...'),
+                              builder: (context) =>
+                                  ChatRoomScreen(jobberName: jobberName),
                             ),
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(
-                            0xFFD0E884,
-                          ), // สีเขียวตองอ่อน
+                          backgroundColor: const Color(0xFFD0E884),
                           foregroundColor: Colors.black87,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                             side: const BorderSide(
-                              color: Colors.black38,
+                              color: Colors.black26,
                               width: 1,
                             ),
                           ),
@@ -193,34 +198,35 @@ class JobberArrivedScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 14),
 
-                    // ปุ่มเริ่มงานได้เลย! (สีส้มเหลือง)
+                    // ปุ่มที่ 2: เริ่มงานได้เลย! (ส่งต่อก้อนข้อมูลจริงเข้า JobberWorkingScreen ครบถ้วน)
                     SizedBox(
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.push(
+                          Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const JobberWorkingScreen(),
-                            ),
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('ยืนยันเริ่มปฏิบัติงานแล้ว'),
+                              builder: (context) => JobberWorkingScreen(
+                                jobberName: jobberName,
+                                rating: rating,
+                                jobTitle: jobTitle,
+                                jobDate: jobDate,
+                                workTimeRange: workTimeRange,
+                                wageAmount: wageAmount,
+                                feeAmount: feeAmount,
+                              ),
                             ),
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(
-                            0xFFF9A800,
-                          ), // สีส้มเหลือง
+                          backgroundColor: const Color(0xFFF9A800),
                           foregroundColor: Colors.black87,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                             side: const BorderSide(
-                              color: Colors.black45,
+                              color: Colors.black38,
                               width: 1,
                             ),
                           ),
@@ -237,7 +243,7 @@ class JobberArrivedScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
             ],
           ),
         ),

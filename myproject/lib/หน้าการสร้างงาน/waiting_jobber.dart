@@ -1,49 +1,79 @@
-// [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
+// lib/หน้าการสร้างงาน/waiting_jobber.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../home.dart'; // ✅ ถูกต้อง
+import '../home.dart';
 import 'jobber_candidates.dart';
 import 'edit_job.dart';
 
 class WaitingJobberScreen extends StatefulWidget {
-  const WaitingJobberScreen({Key? key}) : super(key: key);
+  // บังคับรับค่าจริงทุกตัวจากหน้าสร้างงาน ไม่มีค่าคงที่ตัวอย่าง
+  final String jobTitle;
+  final String jobDesc;
+  final String jobAddress;
+  final String jobDate;
+  final String workTimeRange;
+  final double wageAmount;
+  final double feeAmount;
+
+  const WaitingJobberScreen({
+    Key? key,
+    required this.jobTitle,
+    this.jobDesc = 'ไม่มีรายละเอียดเพิ่มเติม',
+    this.jobAddress = 'พิกัดงานที่ระบุ',
+    required this.jobDate,
+    required this.workTimeRange,
+    required this.wageAmount,
+    this.feeAmount = 0.0,
+  }) : super(key: key);
 
   @override
   State<WaitingJobberScreen> createState() => _WaitingJobberScreenState();
 }
 
 class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
-  String _jobTitle = 'พาหมาไปเดินเล่น';
-  String _jobDesc = 'น้องหมา 2 ตัว ตัวผู้กับตัวเมีย';
-  String _jobAddress = '123/45 หมู่บ้าน สุขใจ ลาดพร้าว80';
-  String _jobDate = '12 พ.ย. 2568';
-  String _jobTime = '16:30 - 17:30';
-  String _jobPrice = '300 บาท';
-  String _jobPayment = 'QR Code';
-
-  // ===========================================================================
-  // [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
-  // ===========================================================================
   Timer? _simulationTimer;
+
+  // ตัวแปรภายใน State เพื่อให้รองรับการแก้ไขข้อมูลงานได้แบบไดนามิก
+  late String _currentTitle;
+  late String _currentDesc;
+  late String _currentAddress;
+  late String _currentDate;
+  late String _currentTime;
+  late double _currentWage;
+
+  @override
+  void initState() {
+    super.initState();
+    // นำค่าจริงที่ส่งมาจาก Constructor ใส่เข้า State
+    _currentTitle = widget.jobTitle;
+    _currentDesc = widget.jobDesc;
+    _currentAddress = widget.jobAddress;
+    _currentDate = widget.jobDate;
+    _currentTime = widget.workTimeRange;
+    _currentWage = widget.wageAmount;
+
+    _startTimer();
+  }
 
   void _startTimer() {
     _simulationTimer?.cancel();
+    // จำลองเมื่อผ่านไป 10 วินาที -> มี Jobber สมัครเข้ามา แล้วส่งข้อมูลชุดนี้ไปหน้าคัดเลือก
     _simulationTimer = Timer(const Duration(seconds: 10), () {
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const JobberCandidatesScreen(),
+            builder: (context) => JobberCandidatesScreen(
+              jobTitle: _currentTitle,
+              jobDate: _currentDate,
+              workTimeRange: _currentTime,
+              wageAmount: _currentWage,
+              feeAmount: widget.feeAmount,
+            ),
           ),
         );
       }
     });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _startTimer();
   }
 
   @override
@@ -54,7 +84,7 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
 
   // Pop-up ยืนยันการยกเลิกงาน
   void _showCancelConfirmationDialog() {
-    _simulationTimer?.cancel(); // หยุดนับเวลาระหว่างเปิด Pop-up
+    _simulationTimer?.cancel();
 
     showDialog(
       context: context,
@@ -66,7 +96,7 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFC6C6), // สีชมพูพาสเทลตามรูป
+              color: const Color(0xFFFFC6C6),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.black, width: 3.5),
               boxShadow: const [
@@ -92,12 +122,11 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // ช่องใส่รูปภาพคนขอร้อง
                     SizedBox(
                       width: 120,
                       height: 120,
                       child: Image.asset(
-                        'assets/cancel_person.png', // เปลี่ยนเป็นชื่อไฟล์รูปภาพของคุณ
+                        'assets/cancel_person.png',
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
@@ -105,24 +134,25 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                               color: Colors.white.withOpacity(0.4),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(
-                              Icons.sentiment_dissatisfied,
-                              size: 60,
-                              color: Colors.black54,
+                            child: const Center(
+                              child: Icon(
+                                Icons.sentiment_dissatisfied,
+                                size: 60,
+                                color: Colors.black54,
+                              ),
                             ),
                           );
                         },
                       ),
                     ),
                     const Spacer(),
-                    // ปุ่ม "ใช่" (สีแดง)
+                    // ปุ่ม "ใช่"
                     SizedBox(
                       width: 78,
                       height: 38,
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.pop(dialogContext); // ปิด Dialog
-                          // ล้าง Route ย้อนกลับไปหน้าแรก และสแตนบายรองานใหม่
+                          Navigator.pop(dialogContext);
                           Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(
@@ -138,7 +168,7 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF3B30), // สีแดงสด
+                          backgroundColor: const Color(0xFFFF3B30),
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -155,19 +185,17 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // ปุ่ม "ไม่ใช่" (สีเขียวตองอ่อน)
+                    // ปุ่ม "ไม่ใช่"
                     SizedBox(
                       width: 78,
                       height: 38,
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.pop(dialogContext); // ปิด Dialog
-                          _startTimer(); // นับเวลาต่อ
+                          Navigator.pop(dialogContext);
+                          _startTimer();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(
-                            0xFF99E22B,
-                          ), // สีเขียวตองอ่อน
+                          backgroundColor: const Color(0xFF99E22B),
                           foregroundColor: Colors.black87,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -201,13 +229,13 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
       MaterialPageRoute(
         builder: (context) => EditJobScreen(
           initialData: {
-            'title': _jobTitle,
-            'desc': _jobDesc,
-            'address': _jobAddress,
-            'date': _jobDate,
-            'time': _jobTime,
-            'price': _jobPrice,
-            'payment': _jobPayment,
+            'title': _currentTitle,
+            'desc': _currentDesc,
+            'address': _currentAddress,
+            'date': _currentDate,
+            'time': _currentTime,
+            'price': _currentWage.toStringAsFixed(0),
+            'payment': 'เงินสด/โอน',
           },
         ),
       ),
@@ -215,13 +243,14 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
 
     if (updatedData != null && mounted) {
       setState(() {
-        _jobTitle = updatedData['title'] ?? _jobTitle;
-        _jobDesc = updatedData['desc'] ?? _jobDesc;
-        _jobAddress = updatedData['address'] ?? _jobAddress;
-        _jobDate = updatedData['date'] ?? _jobDate;
-        _jobTime = updatedData['time'] ?? _jobTime;
-        _jobPrice = updatedData['price'] ?? _jobPrice;
-        _jobPayment = updatedData['payment'] ?? _jobPayment;
+        _currentTitle = updatedData['title'] ?? _currentTitle;
+        _currentDesc = updatedData['desc'] ?? _currentDesc;
+        _currentAddress = updatedData['address'] ?? _currentAddress;
+        _currentDate = updatedData['date'] ?? _currentDate;
+        _currentTime = updatedData['time'] ?? _currentTime;
+        if (updatedData['price'] != null) {
+          _currentWage = double.tryParse(updatedData['price']!) ?? _currentWage;
+        }
       });
     }
 
@@ -247,7 +276,7 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _jobTitle,
+                _currentTitle, // 💡 ชื่องานจริง
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
@@ -270,7 +299,7 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$_jobDate   $_jobTime',
+                      '$_currentDate   $_currentTime',
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.black87,
@@ -285,10 +314,10 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                           color: Colors.red,
                           size: 20,
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            _jobAddress,
+                            _currentAddress,
                             style: const TextStyle(
                               fontSize: 14,
                               color: Colors.black87,
@@ -301,9 +330,7 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                     Padding(
                       padding: const EdgeInsets.only(left: 24),
                       child: Text(
-                        _jobPrice.contains('บาท')
-                            ? _jobPrice
-                            : '$_jobPrice บาท',
+                        '${_currentWage.toStringAsFixed(0)} บาท',
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.black87,
@@ -418,7 +445,15 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                 width: double.infinity,
                 height: 48,
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'ต่อเวลาเปิดรับงานเพิ่มอีก 1 ชั่วโมงแล้ว',
+                        ),
+                      ),
+                    );
+                  },
                   icon: const Icon(
                     Icons.hourglass_empty,
                     color: Colors.black87,
@@ -443,7 +478,7 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
               ),
               const SizedBox(height: 12),
 
-              // ปุ่มยกเลิกงาน (เรียก Pop-up)
+              // ปุ่มยกเลิกงาน
               SizedBox(
                 width: double.infinity,
                 height: 48,

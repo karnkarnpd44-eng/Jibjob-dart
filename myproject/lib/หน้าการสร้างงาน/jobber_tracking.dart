@@ -1,4 +1,4 @@
-// [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
+// lib/หน้าการสร้างงาน/jobber_tracking.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'jobber_arrived.dart';
@@ -7,12 +7,22 @@ class JobberTrackingScreen extends StatefulWidget {
   final String jobberName;
   final String rating;
   final String distance;
+  final String jobTitle;
+  final String jobDate;
+  final String workTimeRange;
+  final double wageAmount;
+  final double feeAmount;
 
   const JobberTrackingScreen({
     Key? key,
-    this.jobberName = 'กิตติพงษ์',
-    this.rating = '4.5',
-    this.distance = '1.5 กม.',
+    required this.jobberName,
+    required this.rating,
+    required this.distance,
+    required this.jobTitle,
+    required this.jobDate,
+    required this.workTimeRange,
+    required this.wageAmount,
+    required this.feeAmount,
   }) : super(key: key);
 
   @override
@@ -33,7 +43,7 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
     // ===========================================================================
     // [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
     // จำลอง Jobber เดินทาง 10 วินาที แล้วสลับหน้าจอไปที่ JobberArrivedScreen อัตโนมัติ
-    // เมื่อต่อหลังบ้านจริง: ให้แทนที่จุดนี้ด้วย Firestore Listener ตรวจสอบสถานะงาน (status == 'jobber_arrived')
+    // พร้อมส่งต่อข้อมูลจริงทั้งหมด
     // ===========================================================================
     _trackingSimulationTimer = Timer(const Duration(seconds: 10), () {
       if (mounted) {
@@ -43,6 +53,11 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
             builder: (context) => JobberArrivedScreen(
               jobberName: widget.jobberName,
               rating: widget.rating,
+              jobTitle: widget.jobTitle,
+              jobDate: widget.jobDate,
+              workTimeRange: widget.workTimeRange,
+              wageAmount: widget.wageAmount,
+              feeAmount: widget.feeAmount,
             ),
           ),
         );
@@ -52,12 +67,7 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
 
   @override
   void dispose() {
-    // ===========================================================================
-    // [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
-    // ยกเลิก Timer เมื่อผู้ใช้ออกจากหน้าจอนี้ก่อนครบ 10 วินาที
-    // ===========================================================================
     _trackingSimulationTimer?.cancel();
-
     super.dispose();
   }
 
@@ -214,18 +224,29 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Column(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // ชื่องานจริง
                           Text(
-                            '12 พ.ย. 2568   16:30 - 17:30',
-                            style: TextStyle(
+                            widget.jobTitle,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // วันที่และช่วงเวลาทำงานจริง
+                          Text(
+                            '${widget.jobDate}   ${widget.workTimeRange}',
+                            style: const TextStyle(
                               fontSize: 13,
                               color: Colors.black87,
                             ),
                           ),
-                          SizedBox(height: 6),
-                          Row(
+                          const SizedBox(height: 6),
+                          const Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Icon(
@@ -245,26 +266,26 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                               ),
                             ],
                           ),
-                          SizedBox(height: 6),
+                          const SizedBox(height: 6),
                           Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.payments_outlined,
                                 color: Colors.green,
                                 size: 18,
                               ),
                               SizedBox(width: 6),
                               Text(
-                                '100 บาท',
-                                style: TextStyle(
+                                '${widget.wageAmount.toStringAsFixed(0)} บาท',
+                                style: const TextStyle(
                                   fontSize: 13,
                                   color: Colors.black87,
                                 ),
                               ),
                             ],
                           ),
-                          SizedBox(height: 6),
-                          Row(
+                          const SizedBox(height: 6),
+                          const Row(
                             children: [
                               Icon(
                                 Icons.access_time,

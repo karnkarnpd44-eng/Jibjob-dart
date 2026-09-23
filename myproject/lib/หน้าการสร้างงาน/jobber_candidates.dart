@@ -1,29 +1,34 @@
+// lib/หน้าการสร้างงาน/jobber_candidates.dart
 import 'package:flutter/material.dart';
-import '../home.dart'; // ✅ ถูกต้อง
+import '../home.dart';
 import 'jobber_tracking.dart';
 
-class JobberCandidatesScreen extends StatelessWidget {
-  const JobberCandidatesScreen({Key? key}) : super(key: key);
+class JobberCandidatesScreen extends StatefulWidget {
+  final String jobTitle;
+  final String jobDate;
+  final String workTimeRange;
+  final double wageAmount;
+  final double feeAmount;
 
-  final List<Map<String, dynamic>> candidates = const [
-    {
-      'name': 'กิตติพงษ์',
-      'rating': '4.5',
-      'distance': '1.5 กม.',
-      'avatar': 'assets/im1.png',
-    },
-    {
-      'name': 'อาทิตยา',
-      'rating': '4.0',
-      'distance': '2.0 กม.',
-      'avatar': 'assets/im2.png',
-    },
-    {
-      'name': 'สมชาย',
-      'rating': '4.8',
-      'distance': '0.8 กม.',
-      'avatar': 'assets/im3.png',
-    },
+  const JobberCandidatesScreen({
+    Key? key,
+    required this.jobTitle,
+    required this.jobDate,
+    required this.workTimeRange,
+    required this.wageAmount,
+    required this.feeAmount,
+  }) : super(key: key);
+
+  @override
+  State<JobberCandidatesScreen> createState() => _JobberCandidatesScreenState();
+}
+
+class _JobberCandidatesScreenState extends State<JobberCandidatesScreen> {
+  // รายชื่อ Jobber จำลองที่กดรับ/สมัครงานนี้เข้ามา
+  final List<Map<String, dynamic>> candidates = [
+    {'name': 'สมชาย สายลุย', 'rating': '4.9', 'distance': '1.2 กม.'},
+    {'name': 'วิภาดา รักสัตว์', 'rating': '4.8', 'distance': '2.5 กม.'},
+    {'name': 'กิตติพงษ์ ตรงเวลา', 'rating': '5.0', 'distance': '3.1 กม.'},
   ];
 
   // Pop-up ยืนยันการยกเลิกงาน
@@ -38,7 +43,7 @@ class JobberCandidatesScreen extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFC6C6), // สีชมพูพาสเทล
+              color: const Color(0xFFFFC6C6),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.black, width: 3.5),
               boxShadow: const [
@@ -68,7 +73,7 @@ class JobberCandidatesScreen extends StatelessWidget {
                       width: 120,
                       height: 120,
                       child: Image.asset(
-                        'assets/cancel_person.png', // เปลี่ยนเป็นชื่อไฟล์รูปภาพของคุณ
+                        'assets/cancel_person.png',
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
@@ -91,8 +96,7 @@ class JobberCandidatesScreen extends StatelessWidget {
                       height: 38,
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.pop(dialogContext); // ปิด Dialog
-                          // ล้าง Stack แล้วย้อนกลับไปหน้าแรก HomeScreen
+                          Navigator.pop(dialogContext);
                           Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(
@@ -175,9 +179,10 @@ class JobberCandidatesScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'พาหมาไปเดินเล่น',
-                style: TextStyle(
+              // 💡 ชื่องานจริงที่ส่งต่อมา
+              Text(
+                widget.jobTitle,
+                style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
                   color: Colors.black,
@@ -185,6 +190,7 @@ class JobberCandidatesScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
 
+              // การ์ดแสดงรายละเอียดงานจริง
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -195,15 +201,19 @@ class JobberCandidatesScreen extends StatelessWidget {
                     width: 1.5,
                   ),
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // วันที่และเวลาทำงานจริง
                     Text(
-                      '12 พ.ย. 2568   16:30 - 17:30',
-                      style: TextStyle(fontSize: 14, color: Colors.black87),
+                      '${widget.jobDate}   ${widget.workTimeRange}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
                     ),
-                    SizedBox(height: 6),
-                    Row(
+                    const SizedBox(height: 6),
+                    const Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(Icons.location_on, color: Colors.red, size: 20),
@@ -219,23 +229,27 @@ class JobberCandidatesScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
+                    // ค่าจ้างจริง
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.payments_outlined,
                           color: Colors.green,
                           size: 20,
                         ),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Text(
-                          '300 บาท',
-                          style: TextStyle(fontSize: 14, color: Colors.black87),
+                          '${widget.wageAmount.toStringAsFixed(0)} บาท',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 6),
-                    Row(
+                    const SizedBox(height: 6),
+                    const Row(
                       children: [
                         Icon(
                           Icons.access_time,
@@ -258,7 +272,7 @@ class JobberCandidatesScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // กล่องรายการ Jobber ที่สามารถเลื่อนได้
+              // กล่องรายการ Jobber ที่สมัครเข้ามา
               Container(
                 height: 220,
                 decoration: BoxDecoration(
@@ -336,6 +350,7 @@ class JobberCandidatesScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
+                            // ปุ่มเลือก Jobber: แนบข้อมูลงานจริงส่งต่อไปยัง JobberTrackingScreen
                             SizedBox(
                               height: 32,
                               child: ElevatedButton(
@@ -348,6 +363,11 @@ class JobberCandidatesScreen extends StatelessWidget {
                                             jobberName: item['name'],
                                             rating: item['rating'],
                                             distance: item['distance'],
+                                            jobTitle: widget.jobTitle,
+                                            jobDate: widget.jobDate,
+                                            workTimeRange: widget.workTimeRange,
+                                            wageAmount: widget.wageAmount,
+                                            feeAmount: widget.feeAmount,
                                           ),
                                     ),
                                   );
@@ -410,7 +430,7 @@ class JobberCandidatesScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // ปุ่มยกเลิกงาน (เรียก Pop-up)
+              // ปุ่มยกเลิกงาน
               SizedBox(
                 width: double.infinity,
                 height: 48,

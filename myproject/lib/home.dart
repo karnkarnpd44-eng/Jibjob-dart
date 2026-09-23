@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'หน้าการสร้างงาน/post_job.dart';
 import 'หน้าการสร้างงาน/waiting_jobber.dart';
 import 'หน้าข้อความ/chat_list.dart';
+import 'หน้าแจ้งเตือน/notification_list.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -102,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF5AB6C3), // สีฟ้าอมเขียวสว่างตามภาพ
+            backgroundColor: const Color(0xFF5AB6C3),
             foregroundColor: Colors.white,
             elevation: 2,
             padding: const EdgeInsets.symmetric(vertical: 40),
@@ -135,17 +136,17 @@ class _HomeScreenState extends State<HomeScreen> {
         children: const [
           LargeCategoryCard(
             text: 'งานบ้านและชีวิตประจำวัน',
-            color: Color(0xFFFFF275), // สีเหลือง
+            color: Color(0xFFFFF275),
             image: 'assets/im1.png',
           ),
           LargeCategoryCard(
             text: 'ฝากซื้อ รับ-ส่งของ',
-            color: Color(0xFFFFC5C5), // สีชมพู
+            color: Color(0xFFFFC5C5),
             image: 'assets/im2.png',
           ),
           LargeCategoryCard(
             text: 'ดูแลสัตว์เลี้ยง',
-            color: Color(0xFF98A6FF), // สีฟ้าม่วง
+            color: Color(0xFF98A6FF),
             image: 'assets/im3.png',
           ),
           LargeCategoryCard(
@@ -200,15 +201,24 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: ElevatedButton(
           onPressed: () {
+            // ส่งค่าพารามิเตอร์ของงานที่สแตนด์บายอยู่เข้าไปตามข้อกำหนดของ WaitingJobberScreen
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const WaitingJobberScreen(),
+                builder: (context) => const WaitingJobberScreen(
+                  jobTitle: 'คนพาหมาไปเดินเล่น',
+                  jobDesc: 'น้องหมา 2 ตัว ตัวผู้กับตัวเมีย',
+                  jobAddress: '123/45 หมู่บ้านสุขใจ ลาดพร้าว80',
+                  jobDate: '12/11/2568',
+                  workTimeRange: '16:30-17:30',
+                  wageAmount: 100.0,
+                  feeAmount: 0.0,
+                ),
               ),
             );
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF00A3E0), // สีฟ้าสด
+            backgroundColor: const Color(0xFF00A3E0),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
             shape: RoundedRectangleBorder(
@@ -240,7 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
         height: 250,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: const Color(0xFFE5E5E5), // พื้นหลังสีเทาอ่อนตามภาพ
+          color: const Color(0xFFE5E5E5),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.black54, width: 1.2),
         ),
@@ -277,16 +287,15 @@ class _HomeScreenState extends State<HomeScreen> {
   // ------------------ BOTTOM NAVBAR (CUSTOM UI) ------------------
   Widget buildCustomBottomNavBar() {
     return Container(
-      color: const Color(0xFF002244), // สีกรมท่าเข้ม
+      color: const Color(0xFF002244),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // หน้าแรก (แถบไฮไลต์สีเขียวมน)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFF6BB82D), // สีเขียวตองอ่อน
+              color: const Color(0xFF6BB82D),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Column(
@@ -305,17 +314,22 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // แจ้งเตือน (มี Badge สีแดง)
           _buildNavItem(
             icon: Icons.notifications,
             label: 'แจ้งเตือน',
             hasBadge: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NotificationListScreen(),
+                ),
+              );
+            },
           ),
 
-          // งานของฉัน
           _buildNavItem(icon: Icons.work, label: 'งานของฉัน'),
 
-          // ข้อความ (มี Badge สีแดง เชื่อมไปยัง ChatListScreen)
           _buildNavItem(
             icon: Icons.chat,
             label: 'ข้อความ',
@@ -328,7 +342,6 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
 
-          // โปรไฟล์
           _buildNavItem(icon: Icons.account_circle, label: 'โปรไฟล์'),
         ],
       ),
