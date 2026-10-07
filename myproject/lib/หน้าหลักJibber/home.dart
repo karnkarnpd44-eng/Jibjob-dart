@@ -1,11 +1,11 @@
 // home.dart
 import 'package:flutter/material.dart';
-import 'หน้าการสร้างงาน/post_job.dart';
-import 'หน้าการสร้างงาน/waiting_jobber.dart';
-import 'หน้าข้อความ/chat_list.dart';
-import 'หน้าแจ้งเตือน/notification_list.dart';
-import 'หน้างานของฉัน/my_jobs.dart';
-import 'หน้าโปรไฟล์ผู้จ้าง/profile.dart';
+import '../หน้าการสร้างงาน/post_job.dart';
+import '../หน้าการสร้างงาน/waiting_jobber.dart';
+import '../หน้าข้อความ/chat_list.dart';
+import '../หน้าแจ้งเตือน/notification_list.dart';
+import '../หน้างานของฉัน/my_jobs.dart';
+import '../หน้าโปรไฟล์ผู้จ้าง/profile.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);

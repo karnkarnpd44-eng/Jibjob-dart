@@ -1,6 +1,6 @@
 // lib/หน้างานของฉัน/my_jobs.dart
 import 'package:flutter/material.dart';
-import '../home.dart';
+import '../หน้าหลักJibber/home.dart';
 import '../หน้าข้อความ/chat_list.dart';
 import '../หน้าแจ้งเตือน/notification_list.dart';
 import '../หน้าโปรไฟล์ผู้จ้าง/profile.dart';

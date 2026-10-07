@@ -1,7 +1,7 @@
 // lib/หน้าการสร้างงาน/waiting_jobber.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../home.dart';
+import '../หน้าหลักJibber/home.dart';
 import '../หน้างานของฉัน/my_jobs.dart'; // แก้ไข path ให้ถอยหลัง 1 ระดับ
 import 'jobber_candidates.dart';
 import 'edit_job.dart';

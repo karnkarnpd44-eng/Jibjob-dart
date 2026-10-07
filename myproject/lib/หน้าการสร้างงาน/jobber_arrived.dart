@@ -4,7 +4,6 @@ import '../หน้าข้อความ/chat_room.dart';
 import 'jobber_working.dart';
 
 class JobberArrivedScreen extends StatelessWidget {
-  // บังคับรับค่าจริงทุกตัว ไม่ใช้ค่าคงที่ Default อีกต่อไป
   final String jobberName;
   final String rating;
   final String jobTitle;
@@ -21,7 +20,7 @@ class JobberArrivedScreen extends StatelessWidget {
     required this.jobDate,
     required this.workTimeRange,
     required this.wageAmount,
-    required this.feeAmount,
+    this.feeAmount = 0.0,
   }) : super(key: key);
 
   @override
@@ -83,7 +82,7 @@ class JobberArrivedScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              jobberName, // 💡 แสดงชื่อคนที่เลือกไว้จริง
+                              jobberName,
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -100,7 +99,7 @@ class JobberArrivedScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  rating, // 💡 แสดงคะแนนรีวิวที่ส่งต่อมา
+                                  rating,
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
@@ -108,14 +107,6 @@ class JobberArrivedScreen extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                const Text(
-                                  'ดูโปรไฟล์',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.black54,
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
                               ],
                             ),
                           ],
@@ -137,31 +128,35 @@ class JobberArrivedScreen extends StatelessWidget {
 
                     // ภาพประกอบ Jobber ขี่มอเตอร์ไซค์
                     SizedBox(
-                      height: 200,
+                      height: 180,
                       width: double.infinity,
-                      child: Image.asset(
-                        'assets/jobber_arrived.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.25),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.two_wheeler,
-                                size: 80,
-                                color: Colors.white70,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.asset(
+                          'assets/jobber_arrived.png', // 👈 ใส่ path และชื่อไฟล์รูปภาพของคุณตรงนี้
+                          fit: BoxFit
+                              .contain, // หรือใช้ BoxFit.cover ถ้าอยากให้รูปเต็มกรอบ
+                          errorBuilder: (context, error, stackTrace) {
+                            // ถ้ารูปโหลดไม่ติด จะแสดงเป็นไอคอนสำรองเดิม ไม่ให้แอปพัง
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.25),
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                            ),
-                          );
-                        },
+                              child: const Center(
+                                child: Icon(
+                                  Icons.two_wheeler,
+                                  size: 80,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 36),
 
-                    // ปุ่มที่ 1: ไปที่แชทเพื่อตรวจสอบ (เปิดห้องแชทของ Jobber คนนี้ทันที)
+                    // ปุ่มที่ 1: ไปที่แชทเพื่อตรวจสอบ
                     SizedBox(
                       width: double.infinity,
                       height: 48,
@@ -198,7 +193,7 @@ class JobberArrivedScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 14),
 
-                    // ปุ่มที่ 2: เริ่มงานได้เลย! (ส่งต่อก้อนข้อมูลจริงเข้า JobberWorkingScreen ครบถ้วน)
+                    // ปุ่มที่ 2: เริ่มงานได้เลย!
                     SizedBox(
                       width: double.infinity,
                       height: 48,

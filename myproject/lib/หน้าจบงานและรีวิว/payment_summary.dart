@@ -1,6 +1,6 @@
 // lib/หน้าการสร้างงาน/payment_summary.dart
 import 'package:flutter/material.dart';
-import '../home.dart';
+import '../หน้าหลักJibber/home.dart';
 import '../หน้างานของฉัน/my_jobs.dart';
 
 class PaymentSummaryScreen extends StatefulWidget {

@@ -1,5 +1,6 @@
+// lib/หน้าโปรไฟล์ผู้จ้าง/profile.dart
 import 'package:flutter/material.dart';
-import '../home.dart';
+import '../หน้าหลักJibber/home.dart';
 import '../หน้าแจ้งเตือน/notification_list.dart';
 import '../หน้างานของฉัน/my_jobs.dart';
 import '../หน้าข้อความ/chat_list.dart';
@@ -7,8 +8,7 @@ import '../หน้าข้อความ/chat_list.dart';
 class ProfileScreen extends StatefulWidget {
   // ===========================================================================
   // [BACKEND HOOKS]
-  // ข้อมูลจริงของผู้ใช้ ปัจจุบันรับผ่าน Constructor และมี Default สำหรับ Mockup
-  // ในอนาคตเชื่อมต่อ: FirebaseAuth.instance.currentUser หรือ Users Collection
+  // ข้อมูลเริ่มต้นของผู้ใช้ รับผ่าน Constructor และรองรับการดึงจาก Firebase
   // ===========================================================================
   final String userName;
   final String userBio;
@@ -34,13 +34,25 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // มุมมองย่อย: 'main', 'payments', 'history', 'settings'
+  // มุมมองย่อย: 'main', 'payments', 'history', 'settings', 'edit_profile'
   String _currentView = 'main';
 
-  // สวิตช์สลับ ผู้จ้าง / ผู้รับจ้าง (ค่าเริ่มต้น: ผู้จ้าง)
+  // ข้อมูลโปรไฟล์ที่สามารถแก้ไขได้
+  late String _currentName;
+  late String _currentBio;
+
+  // Controllers สำหรับหน้าแก้ไขโปรไฟล์
+  late TextEditingController _nameEditController;
+  late TextEditingController _bioEditController;
+
+  // รายการจำลองรูปภาพที่เพิ่มได้สูงสุด 5 ภาพ
+  final List<String> _userImages = [];
+  final int _maxImages = 5;
+
+  // สลับบทบาท ผู้จ้าง / ผู้รับจ้าง
   bool _isEmployer = true;
 
-  // การตั้งค่าแจ้งเตือน
+  // สวิตช์การแจ้งเตือน
   bool _notiEnabled = true;
 
   late List<Map<String, dynamic>> _paymentHistory;
@@ -49,11 +61,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _currentName = widget.userName;
+    _currentBio = widget.userBio;
 
-    // ===========================================================================
-    // [DATA INTEGRATION]
-    // รวมงานจริงที่ส่งต่อมาจากหน้างาน/การจ่ายเงิน เข้ากับรายการประวัติ
-    // ===========================================================================
+    _nameEditController = TextEditingController(text: _currentName);
+    _bioEditController = TextEditingController(
+      text: _currentBio == 'ช่องแนะนำตัว' ? '' : _currentBio,
+    );
+
+    // จำลองข้อมูลประวัติการชำระเงิน
     _paymentHistory = [
       if (widget.activeJobTitle != null && widget.activeWageAmount != null)
         {
@@ -72,6 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
     ];
 
+    // จำลองข้อมูลประวัติการจ้างงาน
     _jobHistory = [
       if (widget.activeJobTitle != null)
         {
@@ -95,6 +112,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'time': '9/11/68',
       },
     ];
+  }
+
+  @override
+  void dispose() {
+    _nameEditController.dispose();
+    _bioEditController.dispose();
+    super.dispose();
   }
 
   @override
@@ -137,6 +161,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return 'ประวัติการจ้างงาน';
       case 'settings':
         return 'การตั้งค่า';
+      case 'edit_profile':
+        return 'แก้ไขโปรไฟล์';
       default:
         return 'โปรไฟล์';
     }
@@ -150,13 +176,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return _buildHistoryView();
       case 'settings':
         return _buildSettingsView();
+      case 'edit_profile':
+        return _buildEditProfileView();
       default:
         return _buildMainProfileView();
     }
   }
 
   // ===========================================================================
-  // 1. หน้าโปรไฟล์หลัก (Profile Main View)
+  // 1. หน้าโปรไฟล์หลัก (Main Profile View)
   // ===========================================================================
   Widget _buildMainProfileView() {
     return SingleChildScrollView(
@@ -164,7 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ส่วนหัว: สวิตช์สลับ ผู้จ้าง / ผู้รับจ้าง
+          // สลับบทบาท ผู้จ้าง / ผู้รับจ้าง
           Align(
             alignment: Alignment.topRight,
             child: Container(
@@ -228,7 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 10),
 
-          // ข้อมูลโปรไฟล์ส่วนตัว
+          // บล็อกข้อมูลโปรไฟล์
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -290,7 +318,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     const SizedBox(height: 8),
                     Text(
-                      widget.userName,
+                      _currentName,
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -298,22 +326,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          widget.userBio,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.black54,
+                    // ปุ่มกดเพื่อแก้ไขข้อมูลคำแนะนำตัว
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _nameEditController.text = _currentName;
+                          _bioEditController.text =
+                              _currentBio == 'ช่องแนะนำตัว' ? '' : _currentBio;
+                          _currentView = 'edit_profile';
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _currentBio,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black54,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.edit_note,
-                          color: Colors.black54,
-                          size: 20,
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          const Icon(
+                            Icons.edit_note,
+                            color: Colors.black54,
+                            size: 22,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -393,7 +437,309 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 2. หน้าย่อย: การชำระเงิน (Payments View)
+  // 2. หน้าย่อย: แก้ไขโปรไฟล์ (Edit Profile View)
+  // ===========================================================================
+  Widget _buildEditProfileView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // -------------------------------------------------------------
+          // ส่วนที่ 0: ส่วนแก้ไขรูปภาพโปรไฟล์หลัก (แยกต่างหากจาก 5 รูป)
+          // -------------------------------------------------------------
+          Center(
+            child: Stack(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF0F4C81),
+                      width: 3,
+                    ),
+                  ),
+                  child: CircleAvatar(
+                    radius: 46,
+                    backgroundColor: Colors.grey[200],
+                    child: const Icon(
+                      Icons.person,
+                      size: 55,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: InkWell(
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('เปิดเลือกรูปภาพโปรไฟล์ใหม่...'),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF4AC4F3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // -------------------------------------------------------------
+          // ส่วนที่ 1: รูปภาพผลงาน (สูงสุด 5 ภาพ)
+          // -------------------------------------------------------------
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'รูปภาพผลงาน',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              Text(
+                '(${_userImages.length}/$_maxImages ภาพ)',
+                style: const TextStyle(fontSize: 13, color: Colors.black54),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // ช่องใส่รูป 5 ช่องแบบ Grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 5,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 1,
+            ),
+            itemCount: _maxImages,
+            itemBuilder: (context, index) {
+              final bool hasImage = index < _userImages.length;
+
+              if (hasImage) {
+                return Stack(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: const Color(0xFFE8F5FD),
+                        border: Border.all(
+                          color: const Color(0xFF4AC4F3),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.image,
+                          color: Color(0xFF0F4C81),
+                          size: 30,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _userImages.removeAt(index);
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            size: 12,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              // ปุ่มกดเพื่อเพิ่มรูปผลงาน
+              return InkWell(
+                onTap: () {
+                  if (_userImages.length < _maxImages) {
+                    setState(() {
+                      _userImages.add('image_${_userImages.length + 1}');
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'เพิ่มรูปภาพผลงานที่ ${_userImages.length} สำเร็จ',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Colors.black26,
+                      style: BorderStyle.solid,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.add_photo_alternate_outlined,
+                      color: Colors.black45,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+
+          // -------------------------------------------------------------
+          // ส่วนที่ 2: ช่องกรอกชื่อ
+          // -------------------------------------------------------------
+          const Text(
+            'ชื่อที่แสดง',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _nameEditController,
+            decoration: InputDecoration(
+              hintText: 'กรอกชื่อของคุณ',
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFF4AC4F3),
+                  width: 1.8,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // -------------------------------------------------------------
+          // ส่วนที่ 3: ช่องกรอกคำแนะนำตัวสั้นๆ ไม่เกิน 100 ตัวอักษร
+          // -------------------------------------------------------------
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'ข้อความแนะนำตัวสั้นๆ',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              Text(
+                'สูงสุด 100 ตัวอักษร',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _bioEditController,
+            maxLength: 100,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText:
+                  'เขียนแนะนำตัวเองสั้นๆ เพื่อให้คู่สนทนารู้จักคุณมากขึ้น...',
+              contentPadding: const EdgeInsets.all(14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFF4AC4F3),
+                  width: 1.8,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 30),
+
+          // ปุ่มบันทึกข้อมูล
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: () {
+                final newName = _nameEditController.text.trim();
+                final newBio = _bioEditController.text.trim();
+
+                setState(() {
+                  if (newName.isNotEmpty) _currentName = newName;
+                  _currentBio = newBio.isNotEmpty ? newBio : 'ช่องแนะนำตัว';
+                  _currentView = 'main';
+                });
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('บันทึกข้อมูลโปรไฟล์เรียบร้อยแล้ว'),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4AC4F3),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'บันทึกข้อมูล',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 3. หน้าย่อย: การชำระเงิน (Payments View)
   // ===========================================================================
   Widget _buildPaymentsView() {
     return ListView.builder(
@@ -473,7 +819,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 3. หน้าย่อย: ประวัติการจ้างงาน (Job History View)
+  // 4. หน้าย่อย: ประวัติการจ้างงาน (Job History View)
   // ===========================================================================
   Widget _buildHistoryView() {
     return ListView.builder(
@@ -532,26 +878,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 4. หน้าย่อย: การตั้งค่าที่จำเป็น (Settings View)
+  // 5. หน้าย่อย: การตั้งค่า (Settings View)
   // ===========================================================================
   Widget _buildSettingsView() {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       children: [
-        // แก้ไขโปรไฟล์
         _buildSettingOption(
           icon: Icons.person_outline,
           title: 'แก้ไขข้อมูลส่วนตัว',
-          subtitle: 'ชื่อ, เบอร์โทรศัพท์, ที่อยู่เริ่มต้น',
+          subtitle: 'แก้ไขชื่อ, รูปโปรไฟล์ และข้อความแนะนำตัว',
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('เปิดหน้าจอแก้ไขข้อมูลส่วนตัว...')),
-            );
+            setState(() {
+              _nameEditController.text = _currentName;
+              _bioEditController.text = _currentBio == 'ช่องแนะนำตัว'
+                  ? ''
+                  : _currentBio;
+              _currentView = 'edit_profile';
+            });
           },
         ),
         const Divider(height: 20),
 
-        // แจ้งเตือน
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           secondary: const Icon(
@@ -574,7 +922,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const Divider(height: 20),
 
-        // ความปลอดภัย
         _buildSettingOption(
           icon: Icons.lock_outline,
           title: 'ความปลอดภัยและรหัสผ่าน',
@@ -587,7 +934,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const Divider(height: 20),
 
-        // ติดต่อฝ่ายบริการลูกค้า
         _buildSettingOption(
           icon: Icons.headset_mic_outlined,
           title: 'ศูนย์ช่วยเหลือและฝ่ายบริการลูกค้า',
@@ -600,16 +946,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 36),
 
-        // ปุ่มออกจากระบบ
         SizedBox(
           width: double.infinity,
           height: 48,
           child: OutlinedButton.icon(
             onPressed: () {
-              // ===============================================================
-              // [BACKEND: SignOut Auth Token]
-              // FirebaseAuth.instance.signOut();
-              // ===============================================================
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -664,7 +1005,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 5. แถบเมนูล่าง (Bottom Navigation Bar)
+  // 6. แถบเมนูล่าง (Bottom Navigation Bar)
   // ===========================================================================
   Widget _buildCustomBottomNavBar() {
     return Container(
