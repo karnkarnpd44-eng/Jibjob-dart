@@ -1,9 +1,10 @@
 // lib/หน้าโปรไฟล์ผู้จ้าง/profile.dart
 import 'package:flutter/material.dart';
-import '../home.dart';
+import '../หน้าหลักjibber/home.dart';
 import '../หน้าแจ้งเตือน/notification_list.dart';
 import '../หน้างานของฉัน/my_jobs.dart';
 import '../หน้าข้อความ/chat_list.dart';
+import '../ฝั่งผู้รับจ้าง JOBBER/jobber_home.dart';
 
 class ProfileScreen extends StatefulWidget {
   // ===========================================================================
@@ -228,7 +229,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => setState(() => _isEmployer = false),
+                    onTap: () {
+                      setState(() => _isEmployer = false);
+                      // สั่งเปิดไปยังหน้า JobberHomeScreen ทันทีเมื่อกดผู้รับจ้าง
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const JobberHomeScreen(),
+                        ),
+                      );
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -1044,7 +1054,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const MyJobsScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const JobberHomeScreen(),
+                ),
               );
             },
           ),
