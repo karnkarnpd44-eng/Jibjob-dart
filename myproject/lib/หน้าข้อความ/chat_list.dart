@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../หน้าหลักJibber/home.dart';
+import '../home.dart';
 import 'chat_room.dart'; // import หน้าห้องแชท
 import '../หน้าแจ้งเตือน/notification_list.dart';
 import '../หน้างานของฉัน/my_jobs.dart';
