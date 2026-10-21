@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../หน้าหลักjibber/home.dart';
+import '../services/auth_service.dart'; // หรือ import '../auth_service.dart'; ตามตำแหน่งที่วางไว้
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -11,6 +14,17 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+
+  // เซอร์วิสสำหรับติดต่อ Firebase
+  final AuthService _authService = AuthService();
+
+  // สถานะการทำงานหลังบ้าน
+  bool _isSendingOtp = false;
+  bool _isVerifyingOtp = false;
+  bool _isSavingData = false;
+  bool _isOtpVerified = false; // ตรวจสอบว่ายืนยัน OTP ผ่านหรือยัง
+  String? _verificationId;
+  DateTime? _selectedBirthDate;
 
   // Controllers สำหรับ Step 1
   final TextEditingController _nameController = TextEditingController();
@@ -42,6 +56,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _nextPage() {
+    // ตรวจสอบความสมบูรณ์ของ Step 1 ก่อนไปต่อ
+    if (_nameController.text.trim().isEmpty) {
+      _showWarningSnackBar('กรุณากรอกชื่อ-นามสกุล');
+      return;
+    }
+    if (_phoneController.text.trim().isEmpty) {
+      _showWarningSnackBar('กรุณากรอกหมายเลขโทรศัพท์');
+      return;
+    }
+    if (!_isOtpVerified) {
+      _showWarningSnackBar('กรุณากดยืนยันรหัส OTP ให้สำเร็จก่อนไปขั้นตอนถัดไป');
+      return;
+    }
+
     _pageController.animateToPage(
       1,
       duration: const Duration(milliseconds: 350),
@@ -57,6 +85,169 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  void _showWarningSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : const Color(0xFF0F4C81),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // ฟังก์ชันส่งรหัส OTP (Firebase Auth)
+  // ===========================================================================
+  void _handleSendOTP() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      _showWarningSnackBar('กรุณากรอกเบอร์โทรศัพท์ก่อนกดขอ OTP');
+      return;
+    }
+
+    setState(() => _isSendingOtp = true);
+
+    await _authService.sendOTP(
+      phoneNumber: phone,
+      onCodeSent: (verificationId) {
+        if (!mounted) return;
+        setState(() {
+          _verificationId = verificationId;
+          _isSendingOtp = false;
+        });
+        _showWarningSnackBar('ส่งรหัส OTP สำเร็จแล้ว');
+      },
+      onError: (errorMessage) {
+        if (!mounted) return;
+        setState(() => _isSendingOtp = false);
+        _showWarningSnackBar('เกิดข้อผิดพลาด: $errorMessage', isError: true);
+      },
+    );
+  }
+
+  // ===========================================================================
+  // ฟังก์ชันยืนยันรหัส OTP
+  // ===========================================================================
+  void _handleVerifyOTP() async {
+    final otp = _otpController.text.trim();
+    if (otp.length != 6) {
+      _showWarningSnackBar('กรุณากรอกรหัส OTP ให้ครบ 6 หลัก');
+      return;
+    }
+
+    final currentVerifyId = _verificationId ?? AuthService.verifyId;
+    if (currentVerifyId == null || currentVerifyId.isEmpty) {
+      _showWarningSnackBar('กรุณากดปุ่ม "ส่งรหัส OTP" ก่อน', isError: true);
+      return;
+    }
+
+    setState(() => _isVerifyingOtp = true);
+
+    try {
+      UserCredential? credential = await _authService.verifyOTP(
+        smsCode: otp,
+        verificationId: currentVerifyId,
+      );
+
+      if (credential?.user != null) {
+        if (!mounted) return;
+        setState(() {
+          _isOtpVerified = true;
+          _isVerifyingOtp = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ยืนยันรหัส OTP ถูกต้องเรียบร้อย'),
+            backgroundColor: Color(0xFF22C55E),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isVerifyingOtp = false);
+      _showWarningSnackBar(
+        'รหัส OTP ไม่ถูกต้อง: ${e.toString()}',
+        isError: true,
+      );
+    }
+  }
+
+  // ===========================================================================
+  // ฟังก์ชันบันทึกข้อมูลผู้ใช้ลง Cloud Firestore (Users Collection)
+  // ===========================================================================
+  void _handleCompleteRegistration() async {
+    final ageText = _ageController.text
+        .replaceAll(RegExp(r'[^0-9]'), '')
+        .trim();
+    final int age = int.tryParse(ageText) ?? 0;
+
+    // เงื่อนไขตรวจสอบอายุขั้นต่ำ 20 ปีบริบูรณ์ตามเอกสารโครงการ
+    if (age < 20) {
+      _showWarningSnackBar(
+        'ขออภัย ผู้ใช้งานต้องมีอายุ 20 ปีบริบูรณ์ขึ้นไป',
+        isError: true,
+      );
+      return;
+    }
+
+    if (_addressController.text.trim().isEmpty) {
+      _showWarningSnackBar('กรุณากรอกที่อยู่ของคุณ');
+      return;
+    }
+
+    setState(() => _isSavingData = true);
+
+    try {
+      final user = _authService.currentUser;
+      final uid = user?.uid ?? DateTime.now().millisecondsSinceEpoch.toString();
+
+      // บันทึกข้อมูลลง Firestore ตาราง Users ตามโครงสร้าง Data Dictionary
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'user_id': uid,
+        'full_name': _nameController.text.trim(),
+        'phone_number': _phoneController.text.trim(),
+        'email': _emailController.text.trim(),
+        'role': 'employer', // ค่าเริ่มต้นสำหรับฝั่งผู้ว่าจ้าง
+        'gender': _selectedGender,
+        'address': _addressController.text.trim(),
+        'birth_date': _selectedBirthDate != null
+            ? Timestamp.fromDate(_selectedBirthDate!)
+            : null,
+        'age': age,
+        'rating_score': 0.0,
+        'total_reviews': 0,
+        'is_active': true,
+        'profile_image_url': '',
+        'created_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('สร้างบัญชีสำเร็จเรียบร้อย!'),
+          backgroundColor: Color(0xFF0F4C81),
+          duration: Duration(seconds: 1),
+        ),
+      );
+
+      // นำทางเข้าสู่หน้าหลัก HomeScreen
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showWarningSnackBar(
+        'เกิดข้อผิดพลาดในการบันทึกข้อมูล: $e',
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingData = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -64,14 +255,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ส่วนหัว: โลโก้ และ Indicator แสดงขั้นตอน
             _buildTopHeader(),
-
-            // ส่วนเนื้อหาแบบสไลด์ (PageView)
             Expanded(
               child: PageView(
                 controller: _pageController,
-                physics: const BouncingScrollPhysics(),
+                physics:
+                    const NeverScrollableScrollPhysics(), // ควบคุมการเลื่อนผ่านปุ่มเท่านั้น
                 onPageChanged: (page) {
                   setState(() {
                     _currentPage = page;
@@ -86,9 +275,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ===========================================================================
-  // 1. ส่วนหัว: แถบโลโก้และตัวบอกสเต็ป
-  // ===========================================================================
   Widget _buildTopHeader() {
     return Container(
       width: double.infinity,
@@ -102,7 +288,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
       child: Column(
         children: [
-          // วงกลมสีขาวพร้อมจัดโลโก้ไว้กึ่งกลางพอดี
           Container(
             width: 86,
             height: 86,
@@ -120,8 +305,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             child: Image.asset(
               'assets/logo2.1.png',
-              width:
-                  58, // ปรับขนาดรูปให้เล็กลงกว่าวงกลมเล็กน้อย เพื่อให้มีขอบหายใจ
+              width: 58,
               height: 58,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => const Icon(
@@ -142,8 +326,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 12),
-
-          // ตัวบอกขั้นตอน (Step Indicator)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -177,9 +359,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ===========================================================================
-  // 2. หน้าสไลด์ที่ 1: ข้อมูลบัญชีผู้ใช้
-  // ===========================================================================
   Widget _buildStep1Page() {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -190,7 +369,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _buildInputLabel('ชื่อ-นามสกุล'),
           _buildInputField(
             controller: _nameController,
-            hintText: 'Segun Phillips',
+            hintText: 'สมชาย ใจดี',
             prefixIcon: Icons.person_outline,
           ),
           const SizedBox(height: 14),
@@ -198,7 +377,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _buildInputLabel('อีเมล'),
           _buildInputField(
             controller: _emailController,
-            hintText: 'segunphilips@gmail.com',
+            hintText: 'example@email.com',
             prefixIcon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
           ),
@@ -222,25 +401,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 14),
 
-          _buildInputLabel('เบอร์โทร'),
+          _buildInputLabel('เบอร์โทรศัพท์'),
           Row(
             children: [
               Expanded(
                 child: _buildInputField(
                   controller: _phoneController,
-                  hintText: '08X-XXX-XXXX',
+                  hintText: 'เช่น 0812345678',
                   prefixIcon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
                 ),
               ),
               const SizedBox(width: 10),
               _buildYellowActionButton(
-                label: 'ส่งรหัส OTP',
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('ส่งรหัส OTP เรียบร้อยแล้ว')),
-                  );
-                },
+                label: _isSendingOtp ? 'กำลังส่ง...' : 'ส่งรหัส OTP',
+                onPressed: _isSendingOtp ? () {} : _handleSendOTP,
               ),
             ],
           ),
@@ -251,19 +426,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Expanded(
                 child: _buildInputField(
                   controller: _otpController,
-                  hintText: 'กรอกรหัส OTP',
+                  hintText: 'กรอกรหัส OTP (6 หลัก)',
                   prefixIcon: Icons.security_outlined,
                   keyboardType: TextInputType.number,
                 ),
               ),
               const SizedBox(width: 10),
               _buildYellowActionButton(
-                label: 'ยืนยัน OTP',
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('ยืนยันรหัส OTP ถูกต้อง')),
-                  );
-                },
+                label: _isOtpVerified
+                    ? 'ยืนยันแล้ว'
+                    : (_isVerifyingOtp ? 'ตรวจ...' : 'ยืนยัน OTP'),
+                onPressed: (_isVerifyingOtp || _isOtpVerified)
+                    ? () {}
+                    : _handleVerifyOTP,
               ),
             ],
           ),
@@ -309,9 +484,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ===========================================================================
-  // 3. หน้าสไลด์ที่ 2: ข้อมูลที่อยู่และวันเกิด
-  // ===========================================================================
   Widget _buildStep2Page() {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -358,47 +530,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 lastDate: DateTime.now(),
               );
               if (picked != null) {
+                _selectedBirthDate = picked;
+                int calculatedAge = DateTime.now().year - picked.year;
+                if (DateTime.now().month < picked.month ||
+                    (DateTime.now().month == picked.month &&
+                        DateTime.now().day < picked.day)) {
+                  calculatedAge--;
+                }
+
                 setState(() {
                   _dobController.text =
                       '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year + 543}';
-                  _ageController.text =
-                      '${DateTime.now().year - picked.year} ปี';
+                  _ageController.text = '$calculatedAge ปี';
                 });
               }
             },
           ),
           const SizedBox(height: 16),
 
-          _buildInputLabel('อายุ'),
+          _buildInputLabel('อายุ (ต้อง 20 ปีขึ้นไป)'),
           _buildInputField(
             controller: _ageController,
             hintText: 'เช่น 25 ปี',
             prefixIcon: Icons.cake_outlined,
-            keyboardType: TextInputType.number,
+            readOnly: true,
           ),
           const SizedBox(height: 32),
 
-          // ปุ่มสร้างบัญชีเสร็จสมบูรณ์ -> เชื่อมต่อไปยัง HomeScreen
           SizedBox(
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('สร้างบัญชีสำเร็จเรียบร้อย!'),
-                    backgroundColor: Color(0xFF0F4C81),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-
-                // ปิดหน้าสมัครทั้งหมดและเปิดหน้าหลัก HomeScreen ของฝั่งผู้ว่าจ้างทันที
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const HomeScreen()),
-                  (route) => false,
-                );
-              },
+              onPressed: _isSavingData ? null : _handleCompleteRegistration,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0F4C81),
                 elevation: 2,
@@ -407,14 +570,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              child: const Text(
-                'สร้างบัญชี',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
+              child: _isSavingData
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text(
+                      'สร้างบัญชี',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 16),
@@ -443,9 +608,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ===========================================================================
-  // วิดเจ็ตประกอบสไตล์นุ่มนวล
-  // ===========================================================================
   Widget _buildInputLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 6),

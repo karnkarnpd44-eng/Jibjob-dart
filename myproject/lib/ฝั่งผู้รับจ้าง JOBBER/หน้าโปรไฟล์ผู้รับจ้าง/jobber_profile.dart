@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../หน้าการรับงาน/jobber_home.dart';
 import '../หน้างานของฉัน/jobber_my_jobs.dart';
 import '../หน้าข้อความ/jobber_messages.dart';
@@ -16,9 +18,9 @@ class JobberProfileScreen extends StatefulWidget {
 
   const JobberProfileScreen({
     Key? key,
-    this.userName = 'ดนัย',
+    this.userName = 'ผู้รับจ้าง',
     this.userBio = 'ช่องแนะนำตัว',
-    this.rating = 4.5,
+    this.rating = 0.0,
     this.activeJobTitle,
     this.activeJobberName,
     this.activeWageAmount,
@@ -35,6 +37,9 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
 
   late String _currentName;
   late String _currentBio;
+  double _currentRating = 0.0;
+  bool _isLoadingUserData = true;
+  bool _isSavingProfile = false;
 
   late TextEditingController _nameEditController;
   late TextEditingController _bioEditController;
@@ -44,13 +49,11 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
-  final TextEditingController _phoneController = TextEditingController(
-    text: '081-234-5678',
-  );
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
 
-  bool _isUsingOtp = false; // สลับเป็นโหมดลืมรหัสผ่าน / ใช้ OTP
-  bool _otpVerified = false; // สถานะว่ายืนยัน OTP สำเร็จแล้วหรือไม่
+  bool _isUsingOtp = false;
+  bool _otpVerified = false;
   bool _obscureOldPass = true;
   bool _obscureNewPass = true;
   bool _obscureConfirmPass = true;
@@ -69,6 +72,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
     super.initState();
     _currentName = widget.userName;
     _currentBio = widget.userBio;
+    _currentRating = widget.rating;
 
     _nameEditController = TextEditingController(text: _currentName);
     _bioEditController = TextEditingController(
@@ -116,6 +120,105 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
         'time': '9/11/68',
       },
     ];
+
+    // ดึงข้อมูลจริงจาก Cloud Firestore
+    _loadUserData();
+  }
+
+  // ===========================================================================
+  // ดึงข้อมูลจริงจาก Cloud Firestore (users collection)
+  // ===========================================================================
+  Future<void> _loadUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (doc.exists && mounted) {
+          final data = doc.data()!;
+          setState(() {
+            _currentName = data['full_name'] ?? widget.userName;
+            _currentBio =
+                data['bio'] != null && data['bio'].toString().isNotEmpty
+                ? data['bio']
+                : 'ช่องแนะนำตัว';
+
+            if (data['rating_score'] != null) {
+              _currentRating = (data['rating_score'] as num).toDouble();
+            }
+
+            _phoneController.text =
+                data['phone_number'] ?? user.phoneNumber ?? '';
+            _nameEditController.text = _currentName;
+            _bioEditController.text = _currentBio == 'ช่องแนะนำตัว'
+                ? ''
+                : _currentBio;
+            _isLoadingUserData = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('>>> เกิดข้อผิดพลาดในการดึงข้อมูล Jobber: $e');
+        if (mounted) setState(() => _isLoadingUserData = false);
+      }
+    } else {
+      if (mounted) setState(() => _isLoadingUserData = false);
+    }
+  }
+
+  // ===========================================================================
+  // บันทึกการแก้ไขข้อมูลโปรไฟล์กลับสู่ Cloud Firestore
+  // ===========================================================================
+  Future<void> _saveProfileData() async {
+    final newName = _nameEditController.text.trim();
+    final newBio = _bioEditController.text.trim();
+
+    if (newName.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('กรุณากรอกชื่อของคุณ')));
+      return;
+    }
+
+    setState(() => _isSavingProfile = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+              'full_name': newName,
+              'bio': newBio,
+              'updated_at': FieldValue.serverTimestamp(),
+            });
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentName = newName;
+        _currentBio = newBio.isNotEmpty ? newBio : 'ช่องแนะนำตัว';
+        _currentView = 'main';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('บันทึกข้อมูลโปรไฟล์เรียบร้อยแล้ว'),
+          backgroundColor: Color(0xFF22C55E),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึก: $e')));
+    } finally {
+      if (mounted) setState(() => _isSavingProfile = false);
+    }
   }
 
   @override
@@ -144,7 +247,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
                 onPressed: () {
                   setState(() {
                     if (_currentView == 'change_password') {
-                      _currentView = 'settings'; // ถอยกลับไปหน้าตั้งค่า
+                      _currentView = 'settings';
                     } else if (_currentView == 'edit_profile') {
                       _currentView = 'settings';
                     } else {
@@ -163,7 +266,13 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
           ),
         ),
       ),
-      body: SafeArea(child: _buildCurrentViewBody()),
+      body: SafeArea(
+        child: _isLoadingUserData && _currentView == 'main'
+            ? const Center(
+                child: CircularProgressIndicator(color: Color(0xFF00AEEF)),
+              )
+            : _buildCurrentViewBody(),
+      ),
       bottomNavigationBar: _buildCustomBottomNavBar(),
     );
   }
@@ -329,7 +438,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${widget.rating} คะแนน/รีวิว',
+                    '${_currentRating > 0 ? _currentRating.toStringAsFixed(1) : "0.0"} คะแนน/รีวิว',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -707,22 +816,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: () {
-                final newName = _nameEditController.text.trim();
-                final newBio = _bioEditController.text.trim();
-
-                setState(() {
-                  if (newName.isNotEmpty) _currentName = newName;
-                  _currentBio = newBio.isNotEmpty ? newBio : 'ช่องแนะนำตัว';
-                  _currentView = 'main';
-                });
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('บันทึกข้อมูลโปรไฟล์เรียบร้อยแล้ว'),
-                  ),
-                );
-              },
+              onPressed: _isSavingProfile ? null : _saveProfileData,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF4AC4F3),
                 foregroundColor: Colors.white,
@@ -731,10 +825,15 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
                 ),
                 elevation: 0,
               ),
-              child: const Text(
-                'บันทึกข้อมูล',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
+              child: _isSavingProfile
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text(
+                      'บันทึกข้อมูล',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -908,8 +1007,6 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
           },
         ),
         const Divider(height: 20),
-
-        // >>> เปิดหน้าจอความปลอดภัยและรหัสผ่าน <<<
         _buildSettingOption(
           icon: Icons.lock_outline,
           title: 'ความปลอดภัยและรหัสผ่าน',
@@ -927,7 +1024,6 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
           },
         ),
         const Divider(height: 20),
-
         _buildSettingOption(
           icon: Icons.headset_mic_outlined,
           title: 'ศูนย์ช่วยเหลือและฝ่ายบริการลูกค้า',
@@ -947,7 +1043,9 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
           width: double.infinity,
           height: 48,
           child: OutlinedButton.icon(
-            onPressed: () {
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (!mounted) return;
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -976,7 +1074,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
   }
 
   // ===========================================================================
-  // 6. หน้าย่อยใหม่: ความปลอดภัยและเปลี่ยนรหัสผ่าน (รองรับกรอกรหัสเดิม & ลืมรหัสผ่านใช้ OTP)
+  // 6. หน้าย่อย: เปลี่ยนรหัสผ่าน (Change Password View)
   // ===========================================================================
   Widget _buildChangePasswordView() {
     return SingleChildScrollView(
@@ -984,7 +1082,6 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // กล่องการ์ดแจ้งข้อมูลด้านบน
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -1019,9 +1116,6 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
           ),
           const SizedBox(height: 24),
 
-          // -------------------------------------------------------------------
-          // กรณีที่ 1: โหมดปกติ (กรอกรหัสผ่านเดิม)
-          // -------------------------------------------------------------------
           if (!_isUsingOtp) ...[
             const Text(
               'รหัสผ่านเดิม',
@@ -1063,7 +1157,6 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
             ),
             const SizedBox(height: 4),
 
-            // ปุ่มกดลืมรหัสผ่านเดิม
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
@@ -1086,9 +1179,6 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
             ),
           ],
 
-          // -------------------------------------------------------------------
-          // กรณีที่ 2: โหมดลืมรหัสผ่าน (ยืนยัน OTP)
-          // -------------------------------------------------------------------
           if (_isUsingOtp) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1102,11 +1192,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _isUsingOtp = false;
-                    });
-                  },
+                  onPressed: () => setState(() => _isUsingOtp = false),
                   child: const Text(
                     'กลับไปใช้รหัสเดิม',
                     style: TextStyle(fontSize: 12.5, color: Colors.grey),
@@ -1206,9 +1292,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
                   ),
                   onPressed: () {
                     if (_otpController.text.trim().isNotEmpty) {
-                      setState(() {
-                        _otpVerified = true;
-                      });
+                      setState(() => _otpVerified = true);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
@@ -1231,9 +1315,6 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
             const SizedBox(height: 10),
           ],
 
-          // -------------------------------------------------------------------
-          // ส่วนที่ 3: กรอกรหัสผ่านใหม่ และ ยืนยันรหัสผ่านใหม่
-          // -------------------------------------------------------------------
           const Text(
             'รหัสผ่านใหม่',
             style: TextStyle(
@@ -1246,9 +1327,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
           TextField(
             controller: _newPasswordController,
             obscureText: _obscureNewPass,
-            enabled:
-                !_isUsingOtp ||
-                _otpVerified, // ถ้าใช้ OTP ต้องตรวจผ่านก่อนจึงจะพิมพ์ได้
+            enabled: !_isUsingOtp || _otpVerified,
             decoration: InputDecoration(
               hintText: 'อย่างน้อย 8 ตัวอักษร',
               hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
@@ -1318,7 +1397,6 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
           ),
           const SizedBox(height: 32),
 
-          // ปุ่มบันทึกรหัสผ่านใหม่
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -1327,7 +1405,6 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
                 final newPass = _newPasswordController.text.trim();
                 final confirmPass = _confirmPasswordController.text.trim();
 
-                // ตรวจสอบความถูกต้องเบื้องต้น
                 if (!_isUsingOtp &&
                     _oldPasswordController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -1366,10 +1443,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
                   return;
                 }
 
-                // บันทึกสำเร็จ
-                setState(() {
-                  _currentView = 'settings';
-                });
+                setState(() => _currentView = 'settings');
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('เปลี่ยนรหัสผ่านใหม่สำเร็จเรียบร้อยแล้ว'),
@@ -1423,7 +1497,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
   }
 
   // ===========================================================================
-  // 7. โครงสร้าง Bottom Navigation Bar (แท็บสีฟ้าฝั่ง Jobber)
+  // 7. แถบเมนูล่าง (Bottom Navigation Bar สไตล์ Jobber)
   // ===========================================================================
   Widget _buildCustomBottomNavBar() {
     return Container(

@@ -1,6 +1,9 @@
+// lib/หน้าlogin/loginwith.dart
 import 'package:flutter/material.dart';
 import 'package:myproject/%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2login/condition.dart';
 import '../หน้าหลักjibber/home.dart';
+import '../services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class JibJobLoginPage extends StatelessWidget {
   const JibJobLoginPage({super.key});
@@ -28,22 +31,19 @@ class JibJobLoginPage extends StatelessWidget {
       ),
       body: Stack(
         children: [
-          // -------------------------------------------------------------
-          // 1. ภาพพื้นหลังจาง ๆ ด้านหลังปุ่มกด (Background Doodle)
-          // -------------------------------------------------------------
+          // 1. ภาพพื้นหลังจาง ๆ ด้านหลังปุ่มกด
           Positioned.fill(
             child: Opacity(
-              opacity: 0.9, // ปรับความชัดของภาพ
+              opacity: 0.35,
               child: Image.asset(
-                'assets/background.jpg', // ตรวจสอบชื่อและนามสกุลไฟล์ให้ตรง
+                'assets/background.jpg',
                 fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const SizedBox(),
               ),
             ),
           ),
 
-          // -------------------------------------------------------------
           // 2. เนื้อหาหลัก โลโก้ และ ปุ่มกด
-          // -------------------------------------------------------------
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -59,7 +59,7 @@ class JibJobLoginPage extends StatelessWidget {
 
                     const SizedBox(height: 60),
 
-                    // ปุ่มเข้าสู่ระบบ (กดแล้วเปิดตัวเลือก เข้าผ่านรหัส หรือ OTP)
+                    // ปุ่มเข้าสู่ระบบ
                     ElevatedButton(
                       onPressed: () => _showLoginBottomSheet(context),
                       style: ElevatedButton.styleFrom(
@@ -78,7 +78,7 @@ class JibJobLoginPage extends StatelessWidget {
 
                     const SizedBox(height: 16),
 
-                    // ปุ่มสร้างบัญชี (นำทางไปหน้าเงื่อนไข)
+                    // ปุ่มสร้างบัญชี
                     ElevatedButton(
                       onPressed: () {
                         Navigator.push(
@@ -111,7 +111,6 @@ class JibJobLoginPage extends StatelessWidget {
     );
   }
 
-  // ส่วนแสดงโลโก้
   Widget _buildLogoSection() {
     return Center(
       child: Image.asset(
@@ -132,9 +131,6 @@ class JibJobLoginPage extends StatelessWidget {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // หน้าต่าง BottomSheet สำหรับเลือกล็อกอิน (รหัสผ่าน vs OTP)
-  // ---------------------------------------------------------------------------
   void _showLoginBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -145,7 +141,9 @@ class JibJobLoginPage extends StatelessWidget {
   }
 }
 
-// Stateful Widget จัดการโหมดล็อกอิน (รหัสผ่าน / OTP)
+// -----------------------------------------------------------------------------
+// คลาสจัดการ BottomSheet สำหรับเข้าสู่ระบบผ่านรหัสผ่าน หรือ OTP จริง
+// -----------------------------------------------------------------------------
 class _LoginBottomSheetContent extends StatefulWidget {
   const _LoginBottomSheetContent();
 
@@ -155,9 +153,12 @@ class _LoginBottomSheetContent extends StatefulWidget {
 }
 
 class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
-  int _selectedTab = 0; // 0 = รหัสผ่าน, 1 = รหัส OTP
+  int _selectedTab = 1; // ตั้งค่าเริ่มต้นให้เปิดแท็บ OTP ก่อน
   bool _obscurePassword = true;
-  bool _otpSent = false;
+  bool _isLoading = false;
+  String? _verificationId;
+
+  final AuthService _authService = AuthService();
 
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -171,6 +172,110 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
     _phoneController.dispose();
     _otpController.dispose();
     super.dispose();
+  }
+
+  // ฟังก์ชันขอส่งรหัส OTP ไปยัง Firebase
+  void _handleSendOTP() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('กรุณากรอกหมายเลขโทรศัพท์')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    await _authService.sendOTP(
+      phoneNumber: phone,
+      onCodeSent: (verificationId) {
+        if (!mounted) return;
+        setState(() {
+          _verificationId = verificationId;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ส่งรหัส OTP สำเร็จแล้ว กรุณากรอกรหัส 6 หลัก'),
+            backgroundColor: Color(0xFF00AEEF),
+          ),
+        );
+      },
+      onError: (errorMessage) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $errorMessage'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      },
+    );
+  }
+
+  // ฟังก์ชันตรวจสอบ OTP และเข้าสู่ระบบ
+  void _handleVerifyAndLogin() async {
+    final otpCode = _otpController.text.trim();
+    if (otpCode.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณากรอกรหัส OTP ให้ครบ 6 หลัก')),
+      );
+      return;
+    }
+
+    // ดึง verificationId จากตัวแปรหน้าจอ หรือจาก AuthService โดยตรง
+    final currentVerifyId = _verificationId ?? AuthService.verifyId;
+
+    if (currentVerifyId == null || currentVerifyId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณากดปุ่ม "ขอ OTP" สีฟ้าให้ระบบส่งรหัสก่อน'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      UserCredential? credential = await _authService.verifyOTP(
+        smsCode: otpCode,
+        verificationId: currentVerifyId,
+      );
+
+      if (credential?.user != null) {
+        final uid = credential!.user!.uid;
+        bool exists = await _authService.checkUserExists(uid);
+
+        if (!mounted) return;
+        Navigator.pop(context); // ปิด BottomSheet
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ยืนยันตัวตนสำเร็จ กำลังเข้าสู่หน้าหลัก...'),
+            backgroundColor: Color(0xFF22C55E),
+          ),
+        );
+
+        // นำทางเข้าสู่หน้าหลัก
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('รหัส OTP ไม่ถูกต้อง: ${e.toString()}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -275,7 +380,7 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
             const SizedBox(height: 22),
 
             // -------------------------------------------------------------
-            // แบบฟอร์ม 1: เข้าด้วยรหัสผ่าน
+            // แท็บ 0: เข้าด้วยรหัสผ่าน
             // -------------------------------------------------------------
             if (_selectedTab == 0) ...[
               TextField(
@@ -328,10 +433,7 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {
-                    // สลับไปใช้ OTP เพื่อกู้คืนรหัสผ่านได้
-                    setState(() => _selectedTab = 1);
-                  },
+                  onPressed: () => setState(() => _selectedTab = 1),
                   child: const Text(
                     'ลืมรหัสผ่าน? ใช้ OTP แทน',
                     style: TextStyle(color: Color(0xFF00AEEF)),
@@ -341,7 +443,7 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
             ],
 
             // -------------------------------------------------------------
-            // แบบฟอร์ม 2: เข้าด้วย OTP
+            // แท็บ 1: เข้าด้วย OTP[cite: 4, 26, 40]
             // -------------------------------------------------------------
             if (_selectedTab == 1) ...[
               Row(
@@ -352,6 +454,7 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
                       keyboardType: TextInputType.phone,
                       decoration: InputDecoration(
                         labelText: 'หมายเลขโทรศัพท์',
+                        hintText: 'เช่น 0812345678',
                         prefixIcon: const Icon(
                           Icons.phone_outlined,
                           color: Color(0xFF0F2B48),
@@ -379,20 +482,20 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed: () {
-                      if (_phoneController.text.trim().isNotEmpty) {
-                        setState(() => _otpSent = true);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('ส่งรหัส OTP ไปยังเบอร์ของคุณแล้ว'),
+                    onPressed: _isLoading ? null : _handleSendOTP,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'ขอ OTP',
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
-                        );
-                      }
-                    },
-                    child: const Text(
-                      'ขอ OTP',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
                   ),
                 ],
               ),
@@ -424,14 +527,20 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
 
             // ปุ่มยืนยันเข้าสู่ระบบ
             ElevatedButton(
-              onPressed: () {
-                // ตัวอย่าง: เข้าสู่ระบบสำเร็จแล้วนำทางไปยัง HomeScreen
-                Navigator.pop(context); // ปิด BottomSheet
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const HomeScreen()),
-                );
-              },
+              onPressed: _isLoading
+                  ? null
+                  : (_selectedTab == 1
+                        ? _handleVerifyAndLogin
+                        : () {
+                            // กรณีล็อกอินด้วยรหัสผ่าน นำทางเข้าหน้าหลัก
+                            Navigator.pop(context);
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const HomeScreen(),
+                              ),
+                            );
+                          }),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0F2B48),
                 minimumSize: const Size.fromHeight(50),
@@ -439,14 +548,16 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text(
-                'เข้าสู่ระบบ',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
+              child: _isLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text(
+                      'เข้าสู่ระบบ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
             ),
           ],
         ),
