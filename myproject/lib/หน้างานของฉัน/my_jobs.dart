@@ -279,6 +279,7 @@ class _MyJobsScreenState extends State<MyJobsScreen> {
 
   Widget _buildCustomBottomNavBar() {
     return Container(
+      height: 80,
       color: const Color(0xFF002244),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(

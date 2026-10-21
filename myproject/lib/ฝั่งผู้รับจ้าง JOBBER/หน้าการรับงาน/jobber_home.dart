@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'jobber_tracking.dart';
+import '../หน้างานของฉัน/jobber_my_jobs.dart';
+import '../หน้าข้อความ/jobber_messages.dart';
+import '../หน้าโปรไฟล์ผู้รับจ้าง/jobber_profile.dart';
 
 class JobberHomeScreen extends StatefulWidget {
   const JobberHomeScreen({Key? key}) : super(key: key);
@@ -35,7 +38,7 @@ class _JobberHomeScreenState extends State<JobberHomeScreen> {
       'location': '123/45 หมู่บ้าน สุขใจ ลาดพร้าว80',
       'timeRange': '16:30-17:30 น.',
       'wageDetail': '95 บาท',
-      'status': 'initial', // สถานะ: initial, waiting, accepted, rejected
+      'status': 'initial',
     },
     {
       'id': 'job_002',
@@ -55,7 +58,6 @@ class _JobberHomeScreenState extends State<JobberHomeScreen> {
   @override
   void initState() {
     super.initState();
-    // จำลองการรอ 10 วินาทีแรก จะเป็นหน้าว่างพร้อมข้อความจางๆ
     _timer = Timer(const Duration(seconds: 10), () {
       if (mounted) {
         setState(() {
@@ -71,9 +73,6 @@ class _JobberHomeScreenState extends State<JobberHomeScreen> {
     super.dispose();
   }
 
-  // ===========================================================================
-  // ป๊อปอัปแจ้งเตือนความเสี่ยง (ถอดแบบจากฝั่งสร้างงานของผู้จ้าง)
-  // ===========================================================================
   void _showRiskWarningDialog(Map<String, dynamic> job) {
     if (_dontShowToday) {
       _onConfirmAcceptJob(job);
@@ -276,13 +275,10 @@ class _JobberHomeScreenState extends State<JobberHomeScreen> {
     );
   }
 
-  // ===========================================================================
-  // เมื่อกดยืนยันรับงาน -> อัปเดตสถานะของงานตัวที่กดจริง
-  // ===========================================================================
   void _onConfirmAcceptJob(Map<String, dynamic> job) {
     setState(() {
       job['status'] = 'waiting';
-      _waitingJobId = job['id']; // จำ ID ของงานที่เพิ่งกดรับไว้
+      _waitingJobId = job['id'];
       if (_selectedJob != null) {
         _selectedJob = null;
       }
@@ -298,7 +294,6 @@ class _JobberHomeScreenState extends State<JobberHomeScreen> {
     );
   }
 
-  // ฟังก์ชันอัปเดตสถานะงานตาม ID จริง (ใช้ได้ทั้งระบบจำลอง และ Firebase ในอนาคต)
   void _updateJobStatusByTarget(String targetStatus) {
     if (_waitingJobId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -330,7 +325,6 @@ class _JobberHomeScreenState extends State<JobberHomeScreen> {
     return _buildJobListView();
   }
 
-  // ================= 1. หน้าหลัก (รายการงานว่าง) =================
   Widget _buildJobListView() {
     final sortedJobs = List<Map<String, dynamic>>.from(_jobList);
     sortedJobs.sort((a, b) {
@@ -544,7 +538,6 @@ class _JobberHomeScreenState extends State<JobberHomeScreen> {
                           ),
                         );
 
-                        // ปัดซ้ายเพื่อลบเฉพาะงานที่สถานะเป็น rejected
                         if (isRejected) {
                           return Dismissible(
                             key: Key(job['id'].toString()),
@@ -605,9 +598,6 @@ class _JobberHomeScreenState extends State<JobberHomeScreen> {
                     ),
             ),
 
-            // =================================================================
-            // แผงปุ่มจำลองสถานการณ์ (ทำงานกับงานที่กดรับจริง ไม่ Fix ค่า)
-            // =================================================================
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               color: Colors.grey.shade100,
@@ -667,32 +657,78 @@ class _JobberHomeScreenState extends State<JobberHomeScreen> {
         ),
       ),
 
-      bottomNavigationBar: Container(
-        height: 60,
-        decoration: const BoxDecoration(color: Color(0xFF00AEEF)),
+      bottomNavigationBar: _buildCustomBottomNavBar(),
+    );
+  }
+
+  // ===========================================================================
+  // โครงสร้าง Bottom Navigation Bar ตามภาพต้นแบบที่ 2 เป๊ะๆ
+  // ===========================================================================
+  Widget _buildCustomBottomNavBar() {
+    return Container(
+      height: 80,
+      color: const Color(0xFF00AEEF),
+      // ปรับ padding ด้านบนเพื่อดันกลุ่มปุ่มและกล่องเขียวให้ร่นลงมา ไม่ชิดขอบบน
+      padding: const EdgeInsets.only(
+        left: 8,
+        right: 8,
+        top: 4, // <--- เพิ่มระยะเว้นจากขอบบน (ลองปรับ 8 - 12 ตามความพอดี)
+        bottom: 4,
+      ),
+      child: SafeArea(
+        top: false,
+        bottom: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
+          crossAxisAlignment: CrossAxisAlignment
+              .center, // จัดให้อยู่กึ่งกลางแนวตั้งของพื้นที่ที่เหลือ
           children: [
-            _buildBottomItem(
+            _buildNavItem(
               icon: Icons.home,
               label: 'หน้าแรก',
               isSelected: true,
+              onTap: () {},
             ),
-            _buildBottomItem(
+            _buildNavItem(
               icon: Icons.work,
               label: 'งานของฉัน',
               isSelected: false,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const JobberMyJobsScreen(initialIndex: 0),
+                  ),
+                );
+              },
             ),
-            _buildBottomItem(
-              icon: Icons.chat_bubble_outline,
+            _buildNavItem(
+              icon: Icons.chat,
               label: 'ข้อความ',
-              isSelected: false,
               hasBadge: true,
+              isSelected: false,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const JobberMessagesScreen(),
+                  ),
+                );
+              },
             ),
-            _buildBottomItem(
-              icon: Icons.person_outline,
+            _buildNavItem(
+              icon: Icons.account_circle,
               label: 'โปรไฟล์',
               isSelected: false,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const JobberProfileScreen(),
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -700,115 +736,64 @@ class _JobberHomeScreenState extends State<JobberHomeScreen> {
     );
   }
 
-  // ===========================================================================
-  // ปุ่มแอ็กชันการ์ดงาน (สลับ สี + ข้อความ ตามสถานะของงานแต่ละตัว)
-  // ===========================================================================
-  Widget _buildActionButton(Map<String, dynamic> job, String status) {
-    if (status == 'waiting') {
-      return SizedBox(
-        height: 28,
-        child: ElevatedButton(
-          onPressed: null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFF9A83E),
-            disabledBackgroundColor: const Color(0xFFF9A83E),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    bool hasBadge = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 71,
+        height: 55,
+        decoration: isSelected
+            ? BoxDecoration(
+                color: const Color(0xFF8DC63F),
+                borderRadius: BorderRadius.circular(10),
+              )
+            : null,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                Icon(icon, color: Colors.white, size: 26),
+                if (hasBadge && !isSelected)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF3B30),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            elevation: 0,
-          ),
-          child: const Text(
-            'กำลังรอ..',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      );
-    } else if (status == 'accepted') {
-      return SizedBox(
-        height: 28,
-        child: ElevatedButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => JobberTrackingScreen(job: job),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                height: 1.1,
               ),
-            );
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF8DC63F),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
             ),
-            elevation: 0,
-          ),
-          child: const Text(
-            'เดินทาง',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      );
-    } else if (status == 'rejected') {
-      return SizedBox(
-        height: 28,
-        child: ElevatedButton(
-          onPressed: null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFFF4848),
-            disabledBackgroundColor: const Color(0xFFFF4848),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
-            ),
-            elevation: 0,
-          ),
-          child: const Text(
-            'ล้มเหลว',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      height: 28,
-      child: ElevatedButton(
-        onPressed: () {
-          _showRiskWarningDialog(job);
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF00AEEF),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          elevation: 0,
-        ),
-        child: const Text(
-          'รับงาน',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+          ],
         ),
       ),
     );
   }
 
-  // ================= 2. หน้ารายละเอียดงาน (12.1) =================
   Widget _buildJobDetailView(Map<String, dynamic> job) {
     final String status = job['status'] ?? 'initial';
 
@@ -986,53 +971,107 @@ class _JobberHomeScreenState extends State<JobberHomeScreen> {
     );
   }
 
-  Widget _buildBottomItem({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    bool hasBadge = false,
-  }) {
-    return Container(
-      padding: isSelected
-          ? const EdgeInsets.symmetric(horizontal: 12, vertical: 4)
-          : EdgeInsets.zero,
-      decoration: isSelected
-          ? BoxDecoration(
-              color: const Color(0xFF8DC63F),
-              borderRadius: BorderRadius.circular(8),
-            )
-          : null,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Icon(icon, color: Colors.white, size: 22),
-              if (hasBadge)
-                Positioned(
-                  top: -2,
-                  right: -4,
-                  child: Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-            ],
+  Widget _buildActionButton(Map<String, dynamic> job, String status) {
+    if (status == 'waiting') {
+      return SizedBox(
+        height: 28,
+        child: ElevatedButton(
+          onPressed: null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFF9A83E),
+            disabledBackgroundColor: const Color(0xFFF9A83E),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
+            ),
+            elevation: 0,
           ),
-          Text(
-            label,
-            style: const TextStyle(
+          child: const Text(
+            'กำลังรอ..',
+            style: TextStyle(
+              fontSize: 12,
               color: Colors.white,
-              fontSize: 10,
               fontWeight: FontWeight.bold,
             ),
           ),
-        ],
+        ),
+      );
+    } else if (status == 'accepted') {
+      return SizedBox(
+        height: 28,
+        child: ElevatedButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => JobberTrackingScreen(job: job),
+              ),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF8DC63F),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
+            ),
+            elevation: 0,
+          ),
+          child: const Text(
+            'เดินทาง',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      );
+    } else if (status == 'rejected') {
+      return SizedBox(
+        height: 28,
+        child: ElevatedButton(
+          onPressed: null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFF4848),
+            disabledBackgroundColor: const Color(0xFFFF4848),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
+            ),
+            elevation: 0,
+          ),
+          child: const Text(
+            'ล้มเหลว',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 28,
+      child: ElevatedButton(
+        onPressed: () {
+          _showRiskWarningDialog(job);
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF00AEEF),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          elevation: 0,
+        ),
+        child: const Text(
+          'รับงาน',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }

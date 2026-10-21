@@ -4,7 +4,8 @@ import '../หน้าหลักjibber/home.dart';
 import '../หน้าแจ้งเตือน/notification_list.dart';
 import '../หน้างานของฉัน/my_jobs.dart';
 import '../หน้าข้อความ/chat_list.dart';
-import '../ฝั่งผู้รับจ้าง JOBBER/jobber_home.dart';
+import '../ฝั่งผู้รับจ้าง JOBBER/หน้าการรับงาน/jobber_home.dart';
+import '../../admin_chat.dart';
 
 class ProfileScreen extends StatefulWidget {
   // ===========================================================================
@@ -35,7 +36,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // มุมมองย่อย: 'main', 'payments', 'history', 'settings', 'edit_profile'
+  // มุมมองย่อย: 'main', 'payments', 'history', 'settings', 'edit_profile', 'change_password'
   String _currentView = 'main';
 
   // ข้อมูลโปรไฟล์ที่สามารถแก้ไขได้
@@ -45,6 +46,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Controllers สำหรับหน้าแก้ไขโปรไฟล์
   late TextEditingController _nameEditController;
   late TextEditingController _bioEditController;
+
+  // Controllers สำหรับหน้าเปลี่ยนรหัสผ่าน
+  final TextEditingController _oldPasswordController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+  final TextEditingController _phoneController = TextEditingController(
+    text: '081-234-5678',
+  );
+  final TextEditingController _otpController = TextEditingController();
+
+  bool _isUsingOtp = false; // สลับเป็นโหมดลืมรหัสผ่าน / ใช้ OTP
+  bool _otpVerified = false; // สถานะว่ายืนยัน OTP สำเร็จแล้วหรือไม่
+  bool _obscureOldPass = true;
+  bool _obscureNewPass = true;
+  bool _obscureConfirmPass = true;
 
   // รายการจำลองรูปภาพที่เพิ่มได้สูงสุด 5 ภาพ
   final List<String> _userImages = [];
@@ -119,6 +136,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _nameEditController.dispose();
     _bioEditController.dispose();
+    _oldPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    _phoneController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
@@ -135,7 +157,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
                 onPressed: () {
                   setState(() {
-                    _currentView = 'main';
+                    if (_currentView == 'change_password') {
+                      _currentView = 'settings'; // ถอยกลับไปหน้าการตั้งค่า
+                    } else if (_currentView == 'edit_profile') {
+                      _currentView = 'settings';
+                    } else {
+                      _currentView = 'main';
+                    }
                   });
                 },
               )
@@ -164,6 +192,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return 'การตั้งค่า';
       case 'edit_profile':
         return 'แก้ไขโปรไฟล์';
+      case 'change_password':
+        return 'ความปลอดภัยและรหัสผ่าน';
       default:
         return 'โปรไฟล์';
     }
@@ -179,6 +209,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return _buildSettingsView();
       case 'edit_profile':
         return _buildEditProfileView();
+      case 'change_password':
+        return _buildChangePasswordView();
       default:
         return _buildMainProfileView();
     }
@@ -455,9 +487,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // -------------------------------------------------------------
-          // ส่วนที่ 0: ส่วนแก้ไขรูปภาพโปรไฟล์หลัก (แยกต่างหากจาก 5 รูป)
-          // -------------------------------------------------------------
           Center(
             child: Stack(
               children: [
@@ -509,9 +538,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 20),
 
-          // -------------------------------------------------------------
-          // ส่วนที่ 1: รูปภาพผลงาน (สูงสุด 5 ภาพ)
-          // -------------------------------------------------------------
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -531,7 +557,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 12),
 
-          // ช่องใส่รูป 5 ช่องแบบ Grid
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -592,7 +617,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               }
 
-              // ปุ่มกดเพื่อเพิ่มรูปผลงาน
               return InkWell(
                 onTap: () {
                   if (_userImages.length < _maxImages) {
@@ -631,9 +655,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 24),
 
-          // -------------------------------------------------------------
-          // ส่วนที่ 2: ช่องกรอกชื่อ
-          // -------------------------------------------------------------
           const Text(
             'ชื่อที่แสดง',
             style: TextStyle(
@@ -665,9 +686,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 20),
 
-          // -------------------------------------------------------------
-          // ส่วนที่ 3: ช่องกรอกคำแนะนำตัวสั้นๆ ไม่เกิน 100 ตัวอักษร
-          // -------------------------------------------------------------
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -708,7 +726,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 30),
 
-          // ปุ่มบันทึกข้อมูล
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -811,14 +828,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     item['time'],
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
-                  const Text(
-                    'รายละเอียด',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.black45,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
                 ],
               ),
             ],
@@ -869,14 +878,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text(
                     item['time'],
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  const Text(
-                    'รายละเอียด',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.black45,
-                      decoration: TextDecoration.underline,
-                    ),
                   ),
                 ],
               ),
@@ -932,14 +933,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const Divider(height: 20),
 
+        // >>> เปิดหน้าจอความปลอดภัยและรหัสผ่าน <<<
         _buildSettingOption(
           icon: Icons.lock_outline,
           title: 'ความปลอดภัยและรหัสผ่าน',
           subtitle: 'เปลี่ยนรหัสผ่านเข้าใช้งาน',
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('เปิดหน้าเปลี่ยนรหัสผ่าน...')),
-            );
+            setState(() {
+              _oldPasswordController.clear();
+              _newPasswordController.clear();
+              _confirmPasswordController.clear();
+              _otpController.clear();
+              _isUsingOtp = false;
+              _otpVerified = false;
+              _currentView = 'change_password';
+            });
           },
         ),
         const Divider(height: 20),
@@ -949,8 +957,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           title: 'ศูนย์ช่วยเหลือและฝ่ายบริการลูกค้า',
           subtitle: 'รายงานปัญหาการใช้งาน',
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('กำลังติดต่อศูนย์บริการ JibJob...')),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    const AdminChatScreen(userRole: 'ผู้ว่าจ้าง'),
+              ),
             );
           },
         ),
@@ -988,6 +1000,423 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // ===========================================================================
+  // 6. หน้าย่อยใหม่: ความปลอดภัยและเปลี่ยนรหัสผ่าน (รองรับรหัสเดิม & ลืมรหัสใช้ OTP)
+  // ===========================================================================
+  Widget _buildChangePasswordView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEDF6FB),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFF00AEEF).withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.shield_outlined,
+                  color: Color(0xFF0F4C81),
+                  size: 24,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _isUsingOtp
+                        ? 'ยืนยันตัวตนด้วยรหัส OTP ผ่านเบอร์โทรศัพท์เพื่อตั้งรหัสผ่านใหม่'
+                        : 'กรุณากรอกรหัสผ่านเดิมเพื่อความปลอดภัยก่อนตั้งรหัสผ่านใหม่',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF0F172A),
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // -------------------------------------------------------------------
+          // โหมดปกติ: กรอกรหัสผ่านเดิม
+          // -------------------------------------------------------------------
+          if (!_isUsingOtp) ...[
+            const Text(
+              'รหัสผ่านเดิม',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _oldPasswordController,
+              obscureText: _obscureOldPass,
+              decoration: InputDecoration(
+                hintText: 'กรอกรหัสผ่านเดิมของคุณ',
+                hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                prefixIcon: const Icon(
+                  Icons.lock_outline,
+                  color: Color(0xFF0F4C81),
+                  size: 20,
+                ),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureOldPass ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.grey,
+                    size: 20,
+                  ),
+                  onPressed: () =>
+                      setState(() => _obscureOldPass = !_obscureOldPass),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () {
+                  setState(() {
+                    _isUsingOtp = true;
+                    _otpVerified = false;
+                  });
+                },
+                child: const Text(
+                  'ลืมรหัสผ่านเดิม? ใช้รหัส OTP แทน',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF00AEEF),
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ),
+          ],
+
+          // -------------------------------------------------------------------
+          // โหมดลืมรหัสผ่าน: ยืนยัน OTP
+          // -------------------------------------------------------------------
+          if (_isUsingOtp) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'ยืนยันเบอร์โทรศัพท์',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isUsingOtp = false;
+                    });
+                  },
+                  child: const Text(
+                    'กลับไปใช้รหัสเดิม',
+                    style: TextStyle(fontSize: 12.5, color: Colors.grey),
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _phoneController,
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(
+                        Icons.phone_outlined,
+                        color: Color(0xFF0F4C81),
+                        size: 20,
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFF000),
+                    foregroundColor: Colors.black87,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'ส่งรหัส OTP ไปยังเบอร์โทรศัพท์ของคุณแล้ว',
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'ส่ง OTP',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _otpController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: 'กรอกรหัส OTP 6 หลัก',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade400,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.security,
+                        color: Color(0xFF0F4C81),
+                        size: 20,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _otpVerified
+                        ? const Color(0xFF22C55E)
+                        : const Color(0xFF0F4C81),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    if (_otpController.text.trim().isNotEmpty) {
+                      setState(() {
+                        _otpVerified = true;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'ยืนยันรหัส OTP ถูกต้อง ปลดล็อกตั้งรหัสผ่านใหม่แล้ว',
+                          ),
+                          backgroundColor: Color(0xFF22C55E),
+                        ),
+                      );
+                    }
+                  },
+                  child: Text(
+                    _otpVerified ? 'ยืนยันแล้ว' : 'ตรวจสอบ',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 10),
+          ],
+
+          // -------------------------------------------------------------------
+          // ตั้งรหัสผ่านใหม่ และ ยืนยันรหัสผ่านใหม่
+          // -------------------------------------------------------------------
+          const Text(
+            'รหัสผ่านใหม่',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _newPasswordController,
+            obscureText: _obscureNewPass,
+            enabled: !_isUsingOtp || _otpVerified,
+            decoration: InputDecoration(
+              hintText: 'อย่างน้อย 8 ตัวอักษร',
+              hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+              prefixIcon: const Icon(
+                Icons.lock_reset,
+                color: Color(0xFF0F4C81),
+                size: 20,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureNewPass ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.grey,
+                  size: 20,
+                ),
+                onPressed: () =>
+                    setState(() => _obscureNewPass = !_obscureNewPass),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          const Text(
+            'ยืนยันรหัสผ่านใหม่',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _confirmPasswordController,
+            obscureText: _obscureConfirmPass,
+            enabled: !_isUsingOtp || _otpVerified,
+            decoration: InputDecoration(
+              hintText: 'กรอกรหัสผ่านใหม่อีกครั้งให้ตรงกัน',
+              hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+              prefixIcon: const Icon(
+                Icons.check_circle_outline,
+                color: Color(0xFF0F4C81),
+                size: 20,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureConfirmPass ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.grey,
+                  size: 20,
+                ),
+                onPressed: () =>
+                    setState(() => _obscureConfirmPass = !_obscureConfirmPass),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // ปุ่มบันทึกรหัสผ่านใหม่
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: () {
+                final newPass = _newPasswordController.text.trim();
+                final confirmPass = _confirmPasswordController.text.trim();
+
+                if (!_isUsingOtp &&
+                    _oldPasswordController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('กรุณากรอกรหัสผ่านเดิม หรือเลือกใช้ OTP'),
+                    ),
+                  );
+                  return;
+                }
+                if (_isUsingOtp && !_otpVerified) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('กรุณายืนยันรหัส OTP ให้ถูกต้องก่อน'),
+                    ),
+                  );
+                  return;
+                }
+                if (newPass.length < 6) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6-8 ตัวอักษร',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                if (newPass != confirmPass) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+
+                setState(() {
+                  _currentView = 'settings';
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('เปลี่ยนรหัสผ่านใหม่สำเร็จเรียบร้อยแล้ว'),
+                    backgroundColor: Color(0xFF22C55E),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(
+                  0xFF002244,
+                ), // สีกรมท่าสไตล์ฝั่งผู้จ้าง
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'บันทึกรหัสผ่านใหม่',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSettingOption({
     required IconData icon,
     required String title,
@@ -1015,10 +1444,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 6. แถบเมนูล่าง (Bottom Navigation Bar)
+  // 7. แถบเมนูล่าง (Bottom Navigation Bar)
   // ===========================================================================
   Widget _buildCustomBottomNavBar() {
     return Container(
+      height: 80,
       color: const Color(0xFF002244),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
@@ -1054,9 +1484,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const JobberHomeScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const MyJobsScreen()),
               );
             },
           ),
