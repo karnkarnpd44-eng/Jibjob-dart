@@ -1,9 +1,11 @@
 // lib/หน้าการสร้างงาน/jobber_tracking.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'jobber_arrived.dart';
 
 class JobberTrackingScreen extends StatefulWidget {
+  final String? jobId; // 💡 เพิ่มรับ jobId เพื่อเชื่อมต่อ Firestore Realtime
   final String jobberName;
   final String rating;
   final String distance;
@@ -15,6 +17,7 @@ class JobberTrackingScreen extends StatefulWidget {
 
   const JobberTrackingScreen({
     Key? key,
+    this.jobId,
     required this.jobberName,
     required this.rating,
     required this.distance,
@@ -30,40 +33,76 @@ class JobberTrackingScreen extends StatefulWidget {
 }
 
 class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
-  // ===========================================================================
-  // [SIMULATION - ลบส่วนนี้เมื่อต่อ Backend จริง]
-  // ตัวแปรจับเวลาสำหรับจำลองการเดินทาง 10 วินาที
-  // ===========================================================================
-  Timer? _trackingSimulationTimer;
+  StreamSubscription<DocumentSnapshot>? _jobSubscription;
 
   @override
   void initState() {
     super.initState();
+    _listenToJobStatus(); // 💡 ดักฟังสถานะงานจาก Firestore แบบ Realtime
+  }
 
-    // จำลอง Jobber เดินทาง 10 วินาที แล้วเปิดหน้า JobberArrivedScreen
-    _trackingSimulationTimer = Timer(const Duration(seconds: 10), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => JobberArrivedScreen(
-              jobberName: widget.jobberName,
-              rating: widget.rating,
-              jobTitle: widget.jobTitle,
-              jobDate: widget.jobDate,
-              workTimeRange: widget.workTimeRange,
-              wageAmount: widget.wageAmount,
-              feeAmount: widget.feeAmount,
-            ),
-          ),
-        );
-      }
-    });
+  // ===========================================================================
+  // ดักฟังสถานะงานแบบ Realtime (แทนที่ Timer 10 วินาทีเดิม)
+  // ===========================================================================
+  void _listenToJobStatus() {
+    if (widget.jobId == null || widget.jobId!.isEmpty) return;
+
+    _jobSubscription = FirebaseFirestore.instance
+        .collection('jobs')
+        .doc(widget.jobId)
+        .snapshots()
+        .listen((snapshot) {
+          if (!mounted || !snapshot.exists) return;
+
+          final data = snapshot.data();
+          if (data != null) {
+            final String status = data['status'] ?? '';
+
+            // เมื่อสถานะเป็น jobber_arrived ให้เปลี่ยนหน้าไป JobberArrivedScreen ทันที
+            if (status == 'jobber_arrived') {
+              _jobSubscription?.cancel();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => JobberArrivedScreen(
+                    jobId: widget.jobId,
+                    jobberName: widget.jobberName,
+                    rating: widget.rating,
+                    jobTitle: widget.jobTitle,
+                    jobDate: widget.jobDate,
+                    workTimeRange: widget.workTimeRange,
+                    wageAmount: widget.wageAmount,
+                    feeAmount: widget.feeAmount,
+                  ),
+                ),
+              );
+            }
+          }
+        });
+  }
+
+  // 💡 ฟังก์ชันจำลองสถานะ "Jobber ถึงแล้ว" สำหรับเทสต์หน้าจอทันที (ถ้าต้องการกดทดสอบ)
+  void _simulateJobberArrived() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => JobberArrivedScreen(
+          jobId: widget.jobId,
+          jobberName: widget.jobberName,
+          rating: widget.rating,
+          jobTitle: widget.jobTitle,
+          jobDate: widget.jobDate,
+          workTimeRange: widget.workTimeRange,
+          wageAmount: widget.wageAmount,
+          feeAmount: widget.feeAmount,
+        ),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    _trackingSimulationTimer?.cancel();
+    _jobSubscription?.cancel();
     super.dispose();
   }
 
@@ -78,6 +117,28 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          // 💡 ปุ่มจำลองสถานะมาถึง เพื่อให้กดเทสต์ข้ามไปหน้า JobberArrivedScreen ได้ทันทีเมื่อต้องการ
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: TextButton.icon(
+              onPressed: _simulateJobberArrived,
+              icon: const Icon(
+                Icons.directions_bike,
+                color: Colors.orange,
+                size: 18,
+              ),
+              label: const Text(
+                'จำลอง Jobber ถึงแล้ว',
+                style: TextStyle(
+                  color: Colors.orange,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -193,7 +254,7 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                         const SizedBox(width: 24),
                         Text(
                           widget.distance,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: Colors.black87,
@@ -268,7 +329,7 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                                 color: Colors.green,
                                 size: 18,
                               ),
-                              SizedBox(width: 6),
+                              const SizedBox(width: 6),
                               Text(
                                 '${widget.wageAmount.toStringAsFixed(0)} บาท',
                                 style: const TextStyle(
@@ -278,7 +339,6 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                               ),
                             ],
                           ),
-                          // 💡 เอาแถว "รอ Jobber ตอบรับ" ออกเรียบร้อยแล้ว
                         ],
                       ),
                     ),

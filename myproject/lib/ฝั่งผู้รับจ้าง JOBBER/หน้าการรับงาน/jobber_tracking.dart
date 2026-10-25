@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'jobber_work_confirmation.dart';
 import '../หน้าข้อความ/jobber_messages.dart';
 import '../หน้างานของฉัน/jobber_my_jobs.dart';
@@ -13,25 +15,254 @@ class JobberTrackingScreen extends StatefulWidget {
 }
 
 class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
-  // ควบคุมการสลับระหว่างหน้ารายละเอียด กับ หน้าเปิดแผนที่เต็มจอ
   bool _isViewingMap = false;
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isViewingMap) {
-      return _buildTrackingMapView();
+  // ===========================================================================
+  // 💡 ฟังก์ชันอัปเดตสถานะ "ถึงแล้ว" ลง Firestore จริง
+  // ===========================================================================
+  Future<void> _updateJobAsArrived(String jobId) async {
+    if (jobId.isEmpty) {
+      _navigateToConfirmation();
+      return;
     }
-    return _buildTrackingDetailView();
+
+    try {
+      await FirebaseFirestore.instance.collection('jobs').doc(jobId).update({
+        'status': 'jobber_arrived',
+        'arrived_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ส่งการแจ้งเตือนไปยังผู้จ้างแล้ว: "Jobber มาถึงแล้ว"'),
+          backgroundColor: Color(0xFF00AEEF),
+        ),
+      );
+
+      _navigateToConfirmation();
+    } catch (e) {
+      debugPrint('>>> อัปเดตสถานะถึงแล้วไม่สำเร็จ: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เกิดข้อผิดพลาด: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   // ===========================================================================
-  // 1. หน้ารายละเอียดการเดินทาง (UI โมเดิร์น + ปุ่มแชทเข้าห้องตรง)
+  // 💡 ฟังก์ชันแสดง Popup ยืนยันการยกเลิกงาน
   // ===========================================================================
-  Widget _buildTrackingDetailView() {
-    final employerName = widget.job['employerName'] ?? 'ผู้ว่าจ้าง';
+  void _showCancelConfirmationDialog(String jobId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'ยืนยันการยกเลิก',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'คุณต้องการจะยกเลิกงานจริงๆ หรอ?',
+            style: TextStyle(fontSize: 15),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text(
+                'ไม่ยกเลิก',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _cancelJobInFirestore(jobId);
+              },
+              child: const Text(
+                'ยืนยันยกเลิก',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ===========================================================================
+  // 💡 ฟังก์ชันอัปเดตสถานะเป็น cancelled ใน Firestore
+  // ===========================================================================
+  Future<void> _cancelJobInFirestore(String jobId) async {
+    if (jobId.isEmpty) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('jobs').doc(jobId).update({
+        'status': 'cancelled',
+        'cancelled_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('คุณได้ยกเลิกงานนี้เรียบร้อยแล้ว'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+
+      // กลับไปหน้า "งานของฉัน"
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const JobberMyJobsScreen(initialIndex: 0),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      debugPrint('>>> ยกเลิกงานไม่สำเร็จ: $e');
+    }
+  }
+
+  void _navigateToConfirmation() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => JobberWorkConfirmationScreen(job: widget.job),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 💡 ฟังก์ชันสร้าง/เปิดห้องแชทอัตโนมัติ Realtime ลงใน Firestore chats collection
+  // ===========================================================================
+  Future<void> _openChatRoom(
+    Map<String, dynamic> liveJobData,
+    String jobId,
+  ) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final employerId =
+        liveJobData['employer_id'] ?? widget.job['employer_id'] ?? '';
+    final employerName =
+        liveJobData['employer_name'] ??
+        liveJobData['employerName'] ??
+        widget.job['employerName'] ??
+        'ผู้ว่าจ้าง';
+
+    if (employerId.isEmpty && jobId.isEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              JobberChatRoomScreen(employerName: employerName, job: widget.job),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final chatQuery = await FirebaseFirestore.instance
+          .collection('chats')
+          .where('job_id', isEqualTo: jobId)
+          .get();
+
+      String chatId = '';
+      if (chatQuery.docs.isNotEmpty) {
+        chatId = chatQuery.docs.first.id;
+      } else {
+        final newChatRef = await FirebaseFirestore.instance
+            .collection('chats')
+            .add({
+              'job_id': jobId,
+              'job_title': liveJobData['title'] ?? widget.job['title'] ?? 'งาน',
+              'participants': [currentUser.uid, employerId],
+              'employer_id': employerId,
+              'jobber_id': currentUser.uid,
+              'last_message': 'เริ่มสนทนา',
+              'updated_at': FieldValue.serverTimestamp(),
+            });
+        chatId = newChatRef.id;
+      }
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => JobberChatRoomScreen(
+            employerName: employerName,
+            job: widget.job,
+            chatId: chatId,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('>>> เปิดห้องแชทไม่สำเร็จ: $e');
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              JobberChatRoomScreen(employerName: employerName, job: widget.job),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final jobId = widget.job['id']?.toString() ?? '';
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: jobId.isNotEmpty
+          ? FirebaseFirestore.instance.collection('jobs').doc(jobId).snapshots()
+          : const Stream.empty(),
+      builder: (context, snapshot) {
+        final Map<String, dynamic> liveData =
+            snapshot.hasData && snapshot.data!.exists
+            ? (snapshot.data!.data() as Map<String, dynamic>)
+            : widget.job;
+
+        if (_isViewingMap) {
+          return _buildTrackingMapView(liveData, jobId);
+        }
+        return _buildTrackingDetailView(liveData, jobId);
+      },
+    );
+  }
+
+  // ===========================================================================
+  // 1. หน้ารายละเอียดการเดินทาง
+  // ===========================================================================
+  Widget _buildTrackingDetailView(Map<String, dynamic> liveData, String jobId) {
+    final title = liveData['title'] ?? liveData['jobType'] ?? '-';
+    final date = liveData['job_date'] ?? liveData['date'] ?? '-';
+    final location = liveData['address'] ?? liveData['location'] ?? '-';
+    final timeRange =
+        liveData['work_time_range'] ?? liveData['timeRange'] ?? '-';
+    final reward =
+        liveData['reward_amount']?.toString() ??
+        liveData['wageDetail'] ??
+        liveData['wage'] ??
+        '-';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC), // พื้นหลังสีเทาอ่อน สบายตา
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -43,14 +274,10 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
             size: 20,
           ),
           onPressed: () {
-            // เมื่อกดย้อนกลับจากหน้าติดตามงาน ให้พาไปหน้างานของฉัน ในแท็บ "กำลังทำอยู่"
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => JobberMyJobsScreen(
-                  inProgressJob: widget.job,
-                  initialIndex: 0,
-                ),
+                builder: (context) => const JobberMyJobsScreen(initialIndex: 0),
               ),
             );
           },
@@ -71,8 +298,6 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 10),
-
-              // กล่องรายละเอียดงาน (การ์ดมิติใหม่ นุ่มนวล ดูมีระดับ)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -116,23 +341,12 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    _buildInfoRow(
-                      'งาน',
-                      widget.job['jobType'] ?? widget.job['title'] ?? '-',
-                    ),
-                    _buildInfoRow('วันที่', widget.job['date'] ?? '-'),
-                    _buildInfoRow('สถานที่', widget.job['location'] ?? '-'),
-                    _buildInfoRow(
-                      'ช่วงเวลาทำงาน',
-                      widget.job['timeRange'] ?? '-',
-                    ),
-                    _buildInfoRow(
-                      'ค่าจ้าง',
-                      '${widget.job['wageDetail'] ?? widget.job['wage'] ?? '-'}',
-                    ),
+                    _buildInfoRow('งาน', title),
+                    _buildInfoRow('วันที่', date),
+                    _buildInfoRow('สถานที่', location),
+                    _buildInfoRow('ช่วงเวลาทำงาน', timeRange),
+                    _buildInfoRow('ค่าจ้าง', '$reward บาท'),
                     const SizedBox(height: 16),
-
-                    // ปุ่มเปิดแผนที่ (ปุ่มสีฟ้า สไตล์โมเดิร์น)
                     SizedBox(
                       width: double.infinity,
                       height: 44,
@@ -159,8 +373,7 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                         ),
                         onPressed: () {
                           setState(() {
-                            _isViewingMap =
-                                true; // สลับเป็นหน้าแผนที่ Google Maps เต็มจอ
+                            _isViewingMap = true;
                           });
                         },
                       ),
@@ -168,10 +381,7 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // ปุ่มแชท -> กดแล้วส่งตรงเข้าสู่ห้องแชทของงานนั้นทันที
               Align(
                 alignment: Alignment.centerRight,
                 child: SizedBox(
@@ -199,25 +409,11 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed: () {
-                      // ส่งตรงเข้า JobberChatRoomScreen ของผู้จ้างคนนั้นทันที
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => JobberChatRoomScreen(
-                            employerName: employerName,
-                            job: widget.job,
-                          ),
-                        ),
-                      );
-                    },
+                    onPressed: () => _openChatRoom(liveData, jobId),
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
-
-              // ไทม์ไลน์สถานะการเดินทาง (Timeline Indicator ดีไซน์สวยงาม)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Row(
@@ -225,7 +421,6 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                   children: [
                     Column(
                       children: [
-                        // จุดที่ 1: กำลังเดินทาง (สำเร็จ / เช็คแล้ว)
                         Container(
                           width: 32,
                           height: 32,
@@ -248,13 +443,11 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                             size: 18,
                           ),
                         ),
-                        // เส้นเชื่อม
                         Container(
                           width: 2.5,
                           height: 48,
                           color: const Color(0xFFCBD5E1),
                         ),
-                        // จุดที่ 2: ถึงที่นัดหมาย (รอดำเนินการ)
                         Container(
                           width: 30,
                           height: 30,
@@ -306,10 +499,8 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                   ],
                 ),
               ),
-
               const Spacer(),
-
-              // ปุ่ม "ถึงแล้ว" (ปุ่มใหญ่ สีเขียวมะนาว เด่นชัด)
+              // ปุ่ม "ถึงแล้ว"
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -323,32 +514,27 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'ส่งการแจ้งเตือนไปยังผู้จ้างแล้ว: "Jobber มาถึงแล้ว"',
-                        ),
-                        backgroundColor: Color(0xFF00AEEF),
-                      ),
-                    );
-
-                    // นำทางไปยังหน้ายืนยันเริ่มงาน
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            JobberWorkConfirmationScreen(job: widget.job),
-                      ),
-                    );
-                  },
+                  onPressed: () => _updateJobAsArrived(jobId),
                   child: const Text(
                     'ถึงแล้ว',
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
+              // 💡 เพิ่มปุ่มยกเลิกงานแบบไม่มีกล่อง (มีแค่ตัวหนังสือ) อยู่ใต้ปุ่มถึงแล้ว
+              TextButton(
+                onPressed: () => _showCancelConfirmationDialog(jobId),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.redAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                child: const Text(
+                  'ยกเลิกงาน',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -356,7 +542,6 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
     );
   }
 
-  // ตัวช่วยแสดงแถวข้อมูลในกล่องรายละเอียด
   Widget _buildInfoRow(String title, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3.5),
@@ -390,9 +575,12 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
   }
 
   // ===========================================================================
-  // 2. หน้าแผนที่ Google Maps (คงเดิมและจัดขอบมนให้เนียนขึ้น)
+  // 2. หน้าแผนที่
   // ===========================================================================
-  Widget _buildTrackingMapView() {
+  Widget _buildTrackingMapView(Map<String, dynamic> liveData, String jobId) {
+    final location =
+        liveData['address'] ?? liveData['location'] ?? 'จุดนัดหมาย';
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -402,7 +590,7 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
           onPressed: () {
             setState(() {
-              _isViewingMap = false; // ย้อนกลับมาหน้ารายละเอียดการเดินทาง
+              _isViewingMap = false;
             });
           },
         ),
@@ -424,12 +612,10 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                     borderRadius: BorderRadius.circular(19),
                     child: Stack(
                       children: [
-                        // ตารางจำลองแผนที่
                         CustomPaint(
                           size: Size.infinite,
                           painter: MapGridPainter(),
                         ),
-                        // หมุดปลายทางพร้อมแสดงชื่อสถานที่จริงของงานนั้น
                         Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -451,7 +637,7 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                                   ],
                                 ),
                                 child: Text(
-                                  widget.job['location'] ?? 'จุดนัดหมาย',
+                                  location,
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -473,10 +659,7 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // ปุ่ม "ถึงแล้ว" ในหน้าแผนที่
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -489,28 +672,23 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'คุณถึงที่หมายแล้ว! ส่งการแจ้งเตือนไปยังผู้จ้างเรียบร้อย',
-                        ),
-                        backgroundColor: Color(0xFF90D925),
-                      ),
-                    );
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            JobberWorkConfirmationScreen(job: widget.job),
-                      ),
-                    );
-                  },
+                  onPressed: () => _updateJobAsArrived(jobId),
                   child: const Text(
                     'ถึงแล้ว',
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => _showCancelConfirmationDialog(jobId),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.redAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                child: const Text(
+                  'ยกเลิกงาน',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
               ),
               const SizedBox(height: 20),
@@ -522,7 +700,6 @@ class _JobberTrackingScreenState extends State<JobberTrackingScreen> {
   }
 }
 
-// ตัววาดเส้นทางจำลองแผนที่
 class MapGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

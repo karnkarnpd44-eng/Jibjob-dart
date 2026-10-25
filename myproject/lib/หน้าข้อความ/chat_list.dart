@@ -1,6 +1,9 @@
+// lib/หน้าข้อความ/chat_list.dart
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../หน้าหลักjibber/home.dart';
-import 'chat_room.dart'; // import หน้าห้องแชท
+import 'chat_room.dart';
 import '../หน้าแจ้งเตือน/notification_list.dart';
 import '../หน้างานของฉัน/my_jobs.dart';
 import '../หน้าโปรไฟล์ผู้จ้าง/profile.dart';
@@ -16,26 +19,7 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  final List<Map<String, dynamic>> _chats = [
-    {
-      'name': 'กิตติพงษ์',
-      'lastMessage': 'กำลังไปครับ!',
-      'time': 'เมื่อสักครู่',
-      'avatar': null,
-    },
-    {
-      'name': 'สมชาย สายลุย',
-      'lastMessage': 'ถึงแล้วครับ รออยู่หน้าหมู่บ้าน',
-      'time': '12:30',
-      'avatar': null,
-    },
-    {
-      'name': 'วิภาดา รักสัตว์',
-      'lastMessage': 'น้องหมาเรียบร้อยดีแล้วนะคะ ขอบคุณค่ะ',
-      'time': 'เมื่อวาน',
-      'avatar': null,
-    },
-  ];
+  final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
   @override
   Widget build(BuildContext context) {
@@ -58,105 +42,131 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
       ),
       body: SafeArea(
-        child: ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          itemCount: _chats.length,
-          itemBuilder: (context, index) {
-            final chat = _chats[index];
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF4AC4F3), width: 1.5),
-              ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ChatRoomScreen(
-                        jobberName: chat['name']?.toString() ?? 'Jobber',
-                        initialMessage:
-                            chat['lastMessage']?.toString() ?? 'สวัสดีครับ',
-                        initialTime: chat['time']?.toString() ?? 'เมื่อสักครู่',
+        child: currentUserId == null
+            ? const Center(child: Text('กรุณาเข้าสู่ระบบก่อนใช้งานแชท'))
+            : StreamBuilder<QuerySnapshot>(
+                // 💡 ดึงห้องแชทที่ผู้ใช้ปัจจุบันมีส่วนร่วม (participants มี uid ของเรา)
+                stream: FirebaseFirestore.instance
+                    .collection('chats')
+                    .where('participants', arrayContains: currentUserId)
+                    .orderBy('updated_at', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF4AC4F3),
                       ),
+                    );
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'ยังไม่มีประวัติการสนทนา',
+                        style: TextStyle(color: Colors.black45, fontSize: 16),
+                      ),
+                    );
+                  }
+
+                  final docs = snapshot.data!.docs;
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
                     ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      Container(
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      final chatData =
+                          docs[index].data() as Map<String, dynamic>;
+                      final chatId = docs[index].id;
+                      final jobTitle = chatData['job_title'] ?? 'งานทั่วไป';
+                      final lastMessage =
+                          chatData['last_message'] ?? 'เริ่มสนทนา';
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: const Color(0xFF0F4C81),
-                            width: 1.8,
+                            color: const Color(0xFF4AC4F3),
+                            width: 1.5,
                           ),
                         ),
-                        child: CircleAvatar(
-                          radius: 28,
-                          backgroundColor: Colors.grey[200],
-                          backgroundImage: chat['avatar'] != null
-                              ? AssetImage(chat['avatar'].toString())
-                              : null,
-                          child: chat['avatar'] == null
-                              ? const Icon(
-                                  Icons.person,
-                                  size: 38,
-                                  color: Colors.grey,
-                                )
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              chat['name']?.toString() ?? '',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatRoomScreen(
+                                  jobberName: jobTitle,
+                                  chatId: chatId, // 💡 ส่ง chatId เข้าห้องแชท
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
                               children: [
-                                Text(
-                                  chat['lastMessage']?.toString() ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
+                                Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: const Color(0xFF0F4C81),
+                                      width: 1.8,
+                                    ),
+                                  ),
+                                  child: const CircleAvatar(
+                                    radius: 28,
+                                    backgroundColor: Colors.grey,
+                                    child: Icon(
+                                      Icons.person,
+                                      size: 38,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  chat['time']?.toString() ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.black45,
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        jobTitle,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        lastMessage,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
+                      );
+                    },
+                  );
+                },
               ),
-            );
-          },
-        ),
       ),
       bottomNavigationBar: buildCustomBottomNavBar(context),
     );

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../หน้าการรับงาน/jobber_home.dart';
 import '../หน้างานของฉัน/jobber_my_jobs.dart';
 import '../หน้าข้อความ/jobber_messages.dart';
 import '../../หน้าหลักjibber/home.dart';
 import '../../admin_chat.dart';
+import '../../services/media_service.dart'; // หรือ import '../media_service.dart'; ตามตำแหน่งที่วางไว้
 
 class JobberProfileScreen extends StatefulWidget {
   final String userName;
@@ -35,11 +38,19 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
   // มุมมองย่อย: 'main', 'payments', 'history', 'settings', 'edit_profile', 'change_password'
   String _currentView = 'main';
 
+  // ข้อมูลโปรไฟล์จริงจาก Firestore
   late String _currentName;
   late String _currentBio;
   double _currentRating = 0.0;
+  String _profileImageUrl = '';
+  List<String> _userImages = [];
+  final int _maxImages = 5;
+
   bool _isLoadingUserData = true;
   bool _isSavingProfile = false;
+  bool _isUploadingMedia = false;
+
+  final MediaService _mediaService = MediaService();
 
   late TextEditingController _nameEditController;
   late TextEditingController _bioEditController;
@@ -57,9 +68,6 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
   bool _obscureOldPass = true;
   bool _obscureNewPass = true;
   bool _obscureConfirmPass = true;
-
-  final List<String> _userImages = [];
-  final int _maxImages = 5;
 
   bool _isEmployer = false;
   bool _notiEnabled = true;
@@ -121,12 +129,11 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
       },
     ];
 
-    // ดึงข้อมูลจริงจาก Cloud Firestore
     _loadUserData();
   }
 
   // ===========================================================================
-  // ดึงข้อมูลจริงจาก Cloud Firestore (users collection)
+  // ดึงข้อมูลสดจาก Cloud Firestore (users collection)
   // ===========================================================================
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -142,12 +149,18 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
           setState(() {
             _currentName = data['full_name'] ?? widget.userName;
             _currentBio =
-                data['bio'] != null && data['bio'].toString().isNotEmpty
+                (data['bio'] != null && data['bio'].toString().isNotEmpty)
                 ? data['bio']
                 : 'ช่องแนะนำตัว';
 
             if (data['rating_score'] != null) {
               _currentRating = (data['rating_score'] as num).toDouble();
+            }
+
+            _profileImageUrl = data['profile_image_url'] ?? '';
+
+            if (data['portfolio_images'] != null) {
+              _userImages = List<String>.from(data['portfolio_images']);
             }
 
             _phoneController.text =
@@ -169,8 +182,106 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
   }
 
   // ===========================================================================
-  // บันทึกการแก้ไขข้อมูลโปรไฟล์กลับสู่ Cloud Firestore
+  // Dialog เลือกถ่ายรูป หรือเลือกจากคลังภาพ
   // ===========================================================================
+  void _showImagePickerChoice({
+    required Function(ImageSource source) onSelected,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Color(0xFF0F4C81)),
+              title: const Text(
+                'ถ่ายภาพสด (Camera)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                onSelected(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.photo_library,
+                color: Color(0xFF00AEEF),
+              ),
+              title: const Text(
+                'เลือกจากคลังภาพ (Gallery)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                onSelected(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // อัปโหลดรูปโปรไฟล์หลัก
+  void _handleUploadProfileImage(ImageSource source) async {
+    setState(() => _isUploadingMedia = true);
+    try {
+      final url = await _mediaService.uploadProfileImage(source: source);
+      if (url != null && mounted) {
+        setState(() {
+          _profileImageUrl = url;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('อัปเดตรูปโปรไฟล์สำเร็จเรียบร้อย'),
+            backgroundColor: Color(0xFF22C55E),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('อัปโหลดรูปโปรไฟล์ล้มเหลว: $e')));
+    } finally {
+      if (mounted) setState(() => _isUploadingMedia = false);
+    }
+  }
+
+  // อัปโหลดรูปผลงาน
+  void _handleUploadPortfolioImage(ImageSource source) async {
+    if (_userImages.length >= _maxImages) return;
+
+    setState(() => _isUploadingMedia = true);
+    try {
+      final url = await _mediaService.uploadPortfolioImage(source: source);
+      if (url != null && mounted) {
+        setState(() {
+          _userImages.add(url);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เพิ่มรูปภาพผลงานที่ ${_userImages.length} สำเร็จ'),
+            backgroundColor: const Color(0xFF22C55E),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('อัปโหลดรูปผลงานล้มเหลว: $e')));
+    } finally {
+      if (mounted) setState(() => _isUploadingMedia = false);
+    }
+  }
+
+  // บันทึกการแก้ไขชื่อและคำแนะนำตัว
   Future<void> _saveProfileData() async {
     final newName = _nameEditController.text.trim();
     final newBio = _bioEditController.text.trim();
@@ -393,6 +504,8 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
             ),
           ),
           const SizedBox(height: 10),
+
+          // บล็อกข้อมูลโปรไฟล์ พร้อมภาพโปรไฟล์จริงจาก Storage
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -411,11 +524,16 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
                         child: CircleAvatar(
                           radius: 38,
                           backgroundColor: Colors.grey[200],
-                          child: const Icon(
-                            Icons.person,
-                            size: 50,
-                            color: Colors.grey,
-                          ),
+                          backgroundImage: _profileImageUrl.isNotEmpty
+                              ? NetworkImage(_profileImageUrl)
+                              : null,
+                          child: _profileImageUrl.isEmpty
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 50,
+                                  color: Colors.grey,
+                                )
+                              : null,
                         ),
                       ),
                       Positioned(
@@ -570,7 +688,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
   }
 
   // ===========================================================================
-  // 2. หน้าย่อย: แก้ไขโปรไฟล์
+  // 2. หน้าย่อย: แก้ไขโปรไฟล์ (อัปโหลดรูปโปรไฟล์ & รูปผลงาน 5 ภาพ)
   // ===========================================================================
   Widget _buildEditProfileView() {
     return SingleChildScrollView(
@@ -592,24 +710,34 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
                   child: CircleAvatar(
                     radius: 46,
                     backgroundColor: Colors.grey[200],
-                    child: const Icon(
-                      Icons.person,
-                      size: 55,
-                      color: Colors.grey,
-                    ),
+                    backgroundImage: _profileImageUrl.isNotEmpty
+                        ? NetworkImage(_profileImageUrl)
+                        : null,
+                    child: _isUploadingMedia
+                        ? const CircularProgressIndicator(
+                            color: Color(0xFF00AEEF),
+                          )
+                        : (_profileImageUrl.isEmpty
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 55,
+                                  color: Colors.grey,
+                                )
+                              : null),
                   ),
                 ),
                 Positioned(
                   bottom: 0,
                   right: 0,
                   child: InkWell(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('เปิดเลือกรูปภาพโปรไฟล์ใหม่...'),
-                        ),
-                      );
-                    },
+                    onTap: _isUploadingMedia
+                        ? null
+                        : () {
+                            _showImagePickerChoice(
+                              onSelected: (source) =>
+                                  _handleUploadProfileImage(source),
+                            );
+                          },
                     child: Container(
                       padding: const EdgeInsets.all(7),
                       decoration: const BoxDecoration(
@@ -628,6 +756,8 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
             ),
           ),
           const SizedBox(height: 20),
+
+          // รายการรูปภาพผลงาน 5 ภาพ
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -646,6 +776,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
             ],
           ),
           const SizedBox(height: 12),
+
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -660,6 +791,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
               final bool hasImage = index < _userImages.length;
 
               if (hasImage) {
+                final imageUrl = _userImages[index];
                 return Stack(
                   children: [
                     Container(
@@ -670,12 +802,9 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
                           color: const Color(0xFF4AC4F3),
                           width: 1.5,
                         ),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.image,
-                          color: Color(0xFF0F4C81),
-                          size: 30,
+                        image: DecorationImage(
+                          image: NetworkImage(imageUrl),
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
@@ -683,7 +812,8 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
                       top: 2,
                       right: 2,
                       child: GestureDetector(
-                        onTap: () {
+                        onTap: () async {
+                          await _mediaService.deletePortfolioImage(imageUrl);
                           setState(() {
                             _userImages.removeAt(index);
                           });
@@ -707,20 +837,16 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
               }
 
               return InkWell(
-                onTap: () {
-                  if (_userImages.length < _maxImages) {
-                    setState(() {
-                      _userImages.add('image_${_userImages.length + 1}');
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'เพิ่มรูปภาพผลงานที่ ${_userImages.length} สำเร็จ',
-                        ),
-                      ),
-                    );
-                  }
-                },
+                onTap: _isUploadingMedia
+                    ? null
+                    : () {
+                        if (_userImages.length < _maxImages) {
+                          _showImagePickerChoice(
+                            onSelected: (source) =>
+                                _handleUploadPortfolioImage(source),
+                          );
+                        }
+                      },
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
                   decoration: BoxDecoration(
@@ -743,6 +869,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
             },
           ),
           const SizedBox(height: 24),
+
           const Text(
             'ชื่อที่แสดง',
             style: TextStyle(
@@ -773,6 +900,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
             ),
           ),
           const SizedBox(height: 20),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -812,6 +940,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
             ),
           ),
           const SizedBox(height: 30),
+
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -965,7 +1094,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
   }
 
   // ===========================================================================
-  // 5. หน้าย่อย: การตั้งค่า (Settings View)
+  // 5. หน้าย่อย: การตั้งค่า
   // ===========================================================================
   Widget _buildSettingsView() {
     return ListView(
@@ -1074,7 +1203,7 @@ class _JobberProfileScreenState extends State<JobberProfileScreen> {
   }
 
   // ===========================================================================
-  // 6. หน้าย่อย: เปลี่ยนรหัสผ่าน (Change Password View)
+  // 6. หน้าย่อย: เปลี่ยนรหัสผ่าน
   // ===========================================================================
   Widget _buildChangePasswordView() {
     return SingleChildScrollView(

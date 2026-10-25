@@ -2,12 +2,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../หน้าหลักjibber/home.dart';
 import '../หน้าแจ้งเตือน/notification_list.dart';
 import '../หน้างานของฉัน/my_jobs.dart';
 import '../หน้าข้อความ/chat_list.dart';
 import '../ฝั่งผู้รับจ้าง JOBBER/หน้าการรับงาน/jobber_home.dart';
 import '../../admin_chat.dart';
+import '../services/media_service.dart'; // หรือ import '../media_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String userName;
@@ -34,16 +37,22 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // มุมมองย่อย: 'main', 'payments', 'history', 'settings', 'edit_profile', 'change_password'
   String _currentView = 'main';
 
-  // ข้อมูลโปรไฟล์ของผู้ใช้
+  // ข้อมูลโปรไฟล์จริงจาก Firestore
   late String _currentName;
   late String _currentBio;
   double _currentRating = 0.0;
-  bool _isLoadingUserData = true;
+  String _profileImageUrl = '';
+  List<String> _userImages = [];
+  final int _maxImages = 5;
 
-  // Controllers สำหรับหน้าแก้ไขโปรไฟล์
+  bool _isLoadingUserData = true;
+  bool _isSavingProfile = false;
+  bool _isUploadingMedia = false;
+
+  final MediaService _mediaService = MediaService();
+
   late TextEditingController _nameEditController;
   late TextEditingController _bioEditController;
 
@@ -60,10 +69,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _obscureOldPass = true;
   bool _obscureNewPass = true;
   bool _obscureConfirmPass = true;
-  bool _isSavingProfile = false;
-
-  final List<String> _userImages = [];
-  final int _maxImages = 5;
 
   bool _isEmployer = true;
   bool _notiEnabled = true;
@@ -125,12 +130,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
     ];
 
-    // โหลดข้อมูลสดจาก Cloud Firestore
     _loadUserData();
   }
 
   // ===========================================================================
-  // ดึงข้อมูลจริงจาก Cloud Firestore (users collection)
+  // ดึงข้อมูลจริงจาก Cloud Firestore
   // ===========================================================================
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -146,13 +150,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           setState(() {
             _currentName = data['full_name'] ?? widget.userName;
             _currentBio =
-                data['bio'] != null && data['bio'].toString().isNotEmpty
+                (data['bio'] != null && data['bio'].toString().isNotEmpty)
                 ? data['bio']
                 : 'ช่องแนะนำตัว';
 
-            // อ่านค่าคะแนนรีวิวสะสม
             if (data['rating_score'] != null) {
               _currentRating = (data['rating_score'] as num).toDouble();
+            }
+
+            _profileImageUrl = data['profile_image_url'] ?? '';
+
+            if (data['portfolio_images'] != null) {
+              _userImages = List<String>.from(data['portfolio_images']);
             }
 
             _phoneController.text =
@@ -174,8 +183,106 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // บันทึกการแก้ไขข้อมูลโปรไฟล์กลับสู่ Cloud Firestore
+  // Dialog เลือกถ่ายรูป หรือเลือกจากคลังภาพ
   // ===========================================================================
+  void _showImagePickerChoice({
+    required Function(ImageSource source) onSelected,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Color(0xFF0F4C81)),
+              title: const Text(
+                'ถ่ายภาพสด (Camera)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                onSelected(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.photo_library,
+                color: Color(0xFF00AEEF),
+              ),
+              title: const Text(
+                'เลือกจากคลังภาพ (Gallery)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                onSelected(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // อัปโหลดรูปโปรไฟล์
+  void _handleUploadProfileImage(ImageSource source) async {
+    setState(() => _isUploadingMedia = true);
+    try {
+      final url = await _mediaService.uploadProfileImage(source: source);
+      if (url != null && mounted) {
+        setState(() {
+          _profileImageUrl = url;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('อัปเดตรูปโปรไฟล์สำเร็จเรียบร้อย'),
+            backgroundColor: Color(0xFF22C55E),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('อัปโหลดรูปโปรไฟล์ล้มเหลว: $e')));
+    } finally {
+      if (mounted) setState(() => _isUploadingMedia = false);
+    }
+  }
+
+  // อัปโหลดรูปผลงาน
+  void _handleUploadPortfolioImage(ImageSource source) async {
+    if (_userImages.length >= _maxImages) return;
+
+    setState(() => _isUploadingMedia = true);
+    try {
+      final url = await _mediaService.uploadPortfolioImage(source: source);
+      if (url != null && mounted) {
+        setState(() {
+          _userImages.add(url);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เพิ่มรูปภาพผลงานที่ ${_userImages.length} สำเร็จ'),
+            backgroundColor: const Color(0xFF22C55E),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('อัปโหลดรูปผลงานล้มเหลว: $e')));
+    } finally {
+      if (mounted) setState(() => _isUploadingMedia = false);
+    }
+  }
+
+  // บันทึกชื่อและคำแนะนำตัว
   Future<void> _saveProfileData() async {
     final newName = _nameEditController.text.trim();
     final newBio = _bioEditController.text.trim();
@@ -317,7 +424,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 1. หน้าโปรไฟล์หลัก (Main Profile View)
+  // 1. หน้าโปรไฟล์หลัก
   // ===========================================================================
   Widget _buildMainProfileView() {
     return SingleChildScrollView(
@@ -325,7 +432,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // สลับบทบาท ผู้จ้าง / ผู้รับจ้าง
           Align(
             alignment: Alignment.topRight,
             child: Container(
@@ -397,7 +503,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 10),
 
-          // บล็อกข้อมูลโปรไฟล์
+          // แสดงรูปโปรไฟล์จริง
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -416,11 +522,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: CircleAvatar(
                           radius: 38,
                           backgroundColor: Colors.grey[200],
-                          child: const Icon(
-                            Icons.person,
-                            size: 50,
-                            color: Colors.grey,
-                          ),
+                          backgroundImage: _profileImageUrl.isNotEmpty
+                              ? NetworkImage(_profileImageUrl)
+                              : null,
+                          child: _profileImageUrl.isEmpty
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 50,
+                                  color: Colors.grey,
+                                )
+                              : null,
                         ),
                       ),
                       Positioned(
@@ -576,7 +687,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 2. หน้าย่อย: แก้ไขโปรไฟล์ (Edit Profile View)
+  // 2. หน้าย่อย: แก้ไขโปรไฟล์ (อัปโหลดรูปโปรไฟล์ & รูปผลงานจริงขึ้น Storage)
   // ===========================================================================
   Widget _buildEditProfileView() {
     return SingleChildScrollView(
@@ -598,24 +709,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: CircleAvatar(
                     radius: 46,
                     backgroundColor: Colors.grey[200],
-                    child: const Icon(
-                      Icons.person,
-                      size: 55,
-                      color: Colors.grey,
-                    ),
+                    backgroundImage: _profileImageUrl.isNotEmpty
+                        ? NetworkImage(_profileImageUrl)
+                        : null,
+                    child: _isUploadingMedia
+                        ? const CircularProgressIndicator(
+                            color: Color(0xFF0F4C81),
+                          )
+                        : (_profileImageUrl.isEmpty
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 55,
+                                  color: Colors.grey,
+                                )
+                              : null),
                   ),
                 ),
                 Positioned(
                   bottom: 0,
                   right: 0,
                   child: InkWell(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('เปิดเลือกรูปภาพโปรไฟล์ใหม่...'),
-                        ),
-                      );
-                    },
+                    onTap: _isUploadingMedia
+                        ? null
+                        : () {
+                            _showImagePickerChoice(
+                              onSelected: (source) =>
+                                  _handleUploadProfileImage(source),
+                            );
+                          },
                     child: Container(
                       padding: const EdgeInsets.all(7),
                       decoration: const BoxDecoration(
@@ -635,6 +756,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 20),
 
+          // รายการรูปภาพผลงาน 5 ภาพ
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -668,6 +790,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               final bool hasImage = index < _userImages.length;
 
               if (hasImage) {
+                final imageUrl = _userImages[index];
                 return Stack(
                   children: [
                     Container(
@@ -678,12 +801,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: const Color(0xFF4AC4F3),
                           width: 1.5,
                         ),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.image,
-                          color: Color(0xFF0F4C81),
-                          size: 30,
+                        image: DecorationImage(
+                          image: NetworkImage(imageUrl),
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
@@ -691,7 +811,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       top: 2,
                       right: 2,
                       child: GestureDetector(
-                        onTap: () {
+                        onTap: () async {
+                          await _mediaService.deletePortfolioImage(imageUrl);
                           setState(() {
                             _userImages.removeAt(index);
                           });
@@ -715,20 +836,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               }
 
               return InkWell(
-                onTap: () {
-                  if (_userImages.length < _maxImages) {
-                    setState(() {
-                      _userImages.add('image_${_userImages.length + 1}');
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'เพิ่มรูปภาพผลงานที่ ${_userImages.length} สำเร็จ',
-                        ),
-                      ),
-                    );
-                  }
-                },
+                onTap: _isUploadingMedia
+                    ? null
+                    : () {
+                        if (_userImages.length < _maxImages) {
+                          _showImagePickerChoice(
+                            onSelected: (source) =>
+                                _handleUploadPortfolioImage(source),
+                          );
+                        }
+                      },
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
                   decoration: BoxDecoration(
@@ -853,7 +970,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 3. หน้าย่อย: การชำระเงิน (Payments View)
+  // 3. หน้าย่อย: การชำระเงิน
   // ===========================================================================
   Widget _buildPaymentsView() {
     return ListView.builder(
@@ -925,7 +1042,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 4. หน้าย่อย: ประวัติการจ้างงาน (Job History View)
+  // 4. หน้าย่อย: ประวัติการจ้างงาน
   // ===========================================================================
   Widget _buildHistoryView() {
     return ListView.builder(
@@ -976,7 +1093,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 5. หน้าย่อย: การตั้งค่า (Settings View)
+  // 5. หน้าย่อย: การตั้งค่า
   // ===========================================================================
   Widget _buildSettingsView() {
     return ListView(
@@ -997,7 +1114,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         ),
         const Divider(height: 20),
-
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           secondary: const Icon(
@@ -1019,7 +1135,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         ),
         const Divider(height: 20),
-
         _buildSettingOption(
           icon: Icons.lock_outline,
           title: 'ความปลอดภัยและรหัสผ่าน',
@@ -1037,7 +1152,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         ),
         const Divider(height: 20),
-
         _buildSettingOption(
           icon: Icons.headset_mic_outlined,
           title: 'ศูนย์ช่วยเหลือและฝ่ายบริการลูกค้า',
@@ -1053,13 +1167,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         ),
         const SizedBox(height: 36),
-
         SizedBox(
           width: double.infinity,
           height: 48,
           child: OutlinedButton.icon(
             onPressed: () async {
-              // ออกจากระบบจริงผ่าน Firebase Auth
               await FirebaseAuth.instance.signOut();
               if (!mounted) return;
               Navigator.pushAndRemoveUntil(
@@ -1090,7 +1202,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 6. หน้าย่อย: เปลี่ยนรหัสผ่าน (Change Password View)
+  // 6. หน้าย่อย: เปลี่ยนรหัสผ่าน
   // ===========================================================================
   Widget _buildChangePasswordView() {
     return SingleChildScrollView(
@@ -1513,7 +1625,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ===========================================================================
-  // 7. แถบเมนูล่าง (Bottom Navigation Bar)
+  // 7. แถบเมนูล่าง
   // ===========================================================================
   Widget _buildCustomBottomNavBar() {
     return Container(
@@ -1568,7 +1680,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               );
             },
           ),
-          // ปุ่มโปรไฟล์ (ไฮไลต์สีเขียว)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(

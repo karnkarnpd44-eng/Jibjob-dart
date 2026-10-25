@@ -1,5 +1,7 @@
 // lib/หน้าการสร้างงาน/post_job.dart
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'waiting_jobber.dart';
 
 class PostJobScreen extends StatefulWidget {
@@ -32,6 +34,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
   // ตัวเลือกการชำระเงิน
   String _paymentMethod = 'QR Code';
 
+  // สถานะกำลังบันทึกข้อมูล
+  bool _isSubmitting = false;
+
   // สไตล์กรอบ Input สีฟ้าขอบมนตาม Mockup
   final OutlineInputBorder _blueInputBorder = OutlineInputBorder(
     borderRadius: BorderRadius.circular(12),
@@ -56,6 +61,91 @@ class _PostJobScreenState extends State<PostJobScreen> {
       '',
     );
     return double.tryParse(cleanedPrice) ?? 100.0;
+  }
+
+  // ===========================================================================
+  // บันทึกข้อมูลงานลง Cloud Firestore ในตาราง 'jobs'
+  // ===========================================================================
+  Future<void> _createJobAndNavigate() async {
+    setState(() => _isSubmitting = true);
+
+    final wage = _parseWageAmount();
+    final title = _titleController.text.trim().isNotEmpty
+        ? _titleController.text.trim()
+        : 'ไม่มีระบุชื่องาน';
+    final desc = _descController.text.trim().isNotEmpty
+        ? _descController.text.trim()
+        : 'ไม่มีรายละเอียดเพิ่มเติม';
+    final address = _addressController.text.trim().isNotEmpty
+        ? _addressController.text.trim()
+        : 'พิกัดงานที่ระบุ';
+    final date = _dateController.text.trim().isNotEmpty
+        ? _dateController.text.trim()
+        : '12/11/2568';
+    final timeRange = _timeController.text.trim().isNotEmpty
+        ? _timeController.text.trim()
+        : '16:30-17:30';
+
+    // 💡 ประกาศและสร้าง Reference ตรงนี้ เพื่อให้ข้างล่างมองเห็นตัวแปรได้
+    final jobDocRef = FirebaseFirestore.instance.collection('jobs').doc();
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final uid = user?.uid ?? 'anonymous_user';
+
+      // ดึงชื่อของผู้ว่าจ้าง
+      String employerName = 'ผู้ว่าจ้าง';
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .get();
+        if (userDoc.exists && userDoc.data() != null) {
+          employerName = userDoc.data()!['full_name'] ?? 'ผู้ว่าจ้าง';
+        }
+      }
+
+      // บันทึกลง jobs collection
+      await jobDocRef.set({
+        'job_id': jobDocRef.id,
+        'employer_id': uid,
+        'employer_name': employerName,
+        'title': title,
+        'description': desc,
+        'address': address,
+        'job_date': date,
+        'work_time_range': timeRange,
+        'reward_amount': wage,
+        'payment_method': _paymentMethod,
+        'status': 'pending', // สถานะ: pending (รอผู้รับจ้าง)
+        'radius_match': 5.0,
+        'created_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('>>> เกิดข้อผิดพลาดในการบันทึก jobs: $e');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+
+    if (!mounted) return;
+
+    // แนบข้อมูลจริงที่กรอกจากฟอร์มส่งต่อไปยัง WaitingJobberScreen
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WaitingJobberScreen(
+          jobId: jobDocRef.id, // ✅ คราวนี้จะไม่แดงแล้ว
+          jobTitle: title,
+          jobDesc: desc,
+          jobAddress: address,
+          jobDate: date,
+          workTimeRange: timeRange,
+          wageAmount: wage,
+          feeAmount: 0.0,
+        ),
+      ),
+    );
   }
 
   // Warning Pop-up แจ้งเตือนข้อตกลงเรื่องความเสี่ยง
@@ -197,40 +287,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                             child: ElevatedButton(
                               onPressed: () {
                                 Navigator.pop(dialogContext); // ปิด Dialog
-                                // แนบข้อมูลจริงที่กรอกจากฟอร์มส่งต่อไปยัง WaitingJobberScreen
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => WaitingJobberScreen(
-                                      jobTitle:
-                                          _titleController.text
-                                              .trim()
-                                              .isNotEmpty
-                                          ? _titleController.text.trim()
-                                          : 'ไม่มีระบุชื่องาน',
-                                      jobDesc:
-                                          _descController.text.trim().isNotEmpty
-                                          ? _descController.text.trim()
-                                          : 'ไม่มีรายละเอียดเพิ่มเติม',
-                                      jobAddress:
-                                          _addressController.text
-                                              .trim()
-                                              .isNotEmpty
-                                          ? _addressController.text.trim()
-                                          : 'พิกัดงานที่ระบุ',
-                                      jobDate:
-                                          _dateController.text.trim().isNotEmpty
-                                          ? _dateController.text.trim()
-                                          : '12/11/2568',
-                                      workTimeRange:
-                                          _timeController.text.trim().isNotEmpty
-                                          ? _timeController.text.trim()
-                                          : '16:30-17:30',
-                                      wageAmount: _parseWageAmount(),
-                                      feeAmount: 0.0,
-                                    ),
-                                  ),
-                                );
+                                _createJobAndNavigate(); // บันทึกลง Firestore และนำทาง
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF99E22B),
@@ -328,6 +385,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
               ),
               const SizedBox(height: 16),
 
+              // ส่วนที่ 1: รายละเอียดงาน
               const Text(
                 'รายละเอียดงาน',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -369,6 +427,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
               ),
               const SizedBox(height: 20),
 
+              // ส่วนที่ 2: สถานที่และเวลา
               const Text(
                 'สถานที่และเวลา',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -469,6 +528,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
               ),
               const SizedBox(height: 20),
 
+              // ส่วนที่ 3: ค่าจ้างและการชำระเงิน
               const Text(
                 'ค่าจ้างและการชำระเงิน',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -578,21 +638,30 @@ class _PostJobScreenState extends State<PostJobScreen> {
                     child: SizedBox(
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _showWarningPopup,
+                        onPressed: _isSubmitting ? null : _showWarningPopup,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF01224F),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: const Text(
-                          'เรียก Jobber ทันที!',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'เรียก Jobber ทันที!',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                   ),

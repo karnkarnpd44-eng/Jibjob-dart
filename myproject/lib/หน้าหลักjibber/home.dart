@@ -1,10 +1,12 @@
-// home.dart
+// lib/หน้าหลักjibber/home.dart
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../หน้าการสร้างงาน/post_job.dart';
 import '../หน้าการสร้างงาน/waiting_jobber.dart';
+import '../หน้างานของฉัน/my_jobs.dart';
 import '../หน้าข้อความ/chat_list.dart';
 import '../หน้าแจ้งเตือน/notification_list.dart';
-import '../หน้างานของฉัน/my_jobs.dart';
 import '../หน้าโปรไฟล์ผู้จ้าง/profile.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -15,18 +17,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: buildAppBar(),
-      body: buildBody(context),
-      bottomNavigationBar: buildCustomBottomNavBar(),
-    );
-  }
-
   // ------------------ APP BAR ------------------
   PreferredSizeWidget buildAppBar() {
     return AppBar(
@@ -80,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
           buildSectionTitle("งานแนะนำ"),
           buildRecommendedCategories(),
           const SizedBox(height: 12),
-          buildSectionTitle("งานที่กำลังรอให้ช่วย"),
+          // 💡 ปุ่มทางลัดงานที่กำลังรอให้ช่วย (เชื่อมต่อ Firestore Realtime อัตโนมัติ)
           buildWaitingJobberButton(context),
           const SizedBox(height: 12),
           buildSectionTitle("ข่าวสาร.."),
@@ -186,61 +176,116 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ------------------ WAITING JOBBER BUTTON ------------------
+  // ------------------ WAITING JOBBER BUTTON (FIRESTORE REALTIME) ------------------
   Widget buildWaitingJobberButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 6,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: ElevatedButton(
-          onPressed: () {
-            // ส่งค่าพารามิเตอร์ของงานที่สแตนด์บายอยู่เข้าไปตามข้อกำหนดของ WaitingJobberScreen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const WaitingJobberScreen(
-                  jobTitle: 'คนพาหมาไปเดินเล่น',
-                  jobDesc: 'น้องหมา 2 ตัว ตัวผู้กับตัวเมีย',
-                  jobAddress: '123/45 หมู่บ้านสุขใจ ลาดพร้าว80',
-                  jobDate: '12/11/2568',
-                  workTimeRange: '16:30-17:30',
-                  wageAmount: 100.0,
-                  feeAmount: 0.0,
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return const SizedBox.shrink();
+
+    return StreamBuilder<QuerySnapshot>(
+      // ดึงงานสถานะ 'pending' ที่เป็นของผู้ว่าจ้างคนนี้
+      stream: FirebaseFirestore.instance
+          .collection('jobs')
+          .where('employer_id', isEqualTo: currentUserId)
+          .where('status', isEqualTo: 'pending')
+          .snapshots(),
+      builder: (context, snapshot) {
+        // หากไม่มีงานค้างรอรับ ให้ซ่อนปุ่มและหัวข้อนี้ไปเลย
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        // ดึงข้อมูลจริงของงานล่าสุดที่สร้าง
+        final latestJobDoc = snapshot.data!.docs.first;
+        final jobData = latestJobDoc.data() as Map<String, dynamic>;
+
+        final String jobId = latestJobDoc.id;
+        final String title = jobData['title'] ?? 'ไม่มีระบุชื่องาน';
+        final String desc =
+            jobData['description'] ?? 'ไม่มีรายละเอียดเพิ่มเติม';
+        final String address =
+            jobData['address'] ?? '123/45 หมู่บ้านสุขใจ ลาดพร้าว80';
+        final String date = jobData['job_date'] ?? '12/11/2568';
+        final String timeRange = jobData['work_time_range'] ?? '16:30-17:30';
+        final double wage = (jobData['reward_amount'] is num)
+            ? (jobData['reward_amount'] as num).toDouble()
+            : 100.0;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            buildSectionTitle("งานที่กำลังรอให้ช่วย"),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: () {
+                    // ส่งข้อมูลจริงทั้งหมดไปยัง WaitingJobberScreen
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => WaitingJobberScreen(
+                          jobId: jobId,
+                          jobTitle: title,
+                          jobDesc: desc,
+                          jobAddress: address,
+                          jobDate: date,
+                          workTimeRange: timeRange,
+                          wageAmount: wage,
+                          feeAmount: 0.0,
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(
+                      0xFF00AEEF,
+                    ), // สีฟ้าตามภาพที่ 1
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 18,
+                      horizontal: 20,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      side: const BorderSide(color: Colors.black87, width: 1.5),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'รอ Jobber รับงาน ($title)...',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios,
+                        size: 20,
+                        color: Colors.black87,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            );
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF00A3E0),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-              side: const BorderSide(color: Colors.black87, width: 1.5),
             ),
-            elevation: 0,
-          ),
-          child: const Row(
-            children: [
-              Text(
-                'รอ Jobber รับงาน...',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Spacer(),
-              Icon(Icons.arrow_forward_ios, size: 22, color: Colors.black87),
-            ],
-          ),
-        ),
-      ),
+          ],
+        );
+      },
     );
   }
 
@@ -286,10 +331,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ------------------ BOTTOM NAVBAR (CUSTOM UI) ------------------
+  // ------------------ BOTTOM NAVBAR ------------------
   Widget buildCustomBottomNavBar() {
     return Container(
-      height: 80,
       color: const Color(0xFF002244),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
@@ -316,7 +360,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-
           _buildNavItem(
             icon: Icons.notifications,
             label: 'แจ้งเตือน',
@@ -330,7 +373,6 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
-
           _buildNavItem(
             icon: Icons.work,
             label: 'งานของฉัน',
@@ -341,7 +383,6 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
-
           _buildNavItem(
             icon: Icons.chat,
             label: 'ข้อความ',
@@ -353,7 +394,6 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
-
           _buildNavItem(
             icon: Icons.account_circle,
             label: 'โปรไฟล์',
@@ -406,6 +446,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: buildAppBar(),
+      body: buildBody(context),
+      bottomNavigationBar: buildCustomBottomNavBar(),
     );
   }
 }

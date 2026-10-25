@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../หน้าการรับงาน/jobber_home.dart';
 import '../หน้างานของฉัน/jobber_my_jobs.dart';
 import '../หน้าโปรไฟล์ผู้รับจ้าง/jobber_profile.dart';
@@ -13,29 +15,7 @@ class JobberMessagesScreen extends StatefulWidget {
 }
 
 class _JobberMessagesScreenState extends State<JobberMessagesScreen> {
-  late List<Map<String, dynamic>> _chatRooms;
-
-  @override
-  void initState() {
-    super.initState();
-    _chatRooms = [
-      {
-        'id': 'room_01',
-        'name': widget.job?['employerName'] ?? 'ดนัย',
-        'avatar': 'assets/employer_avatar.png',
-        'lastMessage': 'ส่งเมื่อ 1 นาทีที่ผ่านมา',
-        'job':
-            widget.job ??
-            {
-              'jobType': 'คนพาหมาไปเดินเล่น',
-              'employerName': 'ดนัย',
-              'wage': '100 ฿',
-              'location': '123/45 หมู่บ้าน สุขใจ ลาดพร้าว80',
-              'timeRange': '16:30-17:30 น.',
-            },
-      },
-    ];
-  }
+  final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
   @override
   Widget build(BuildContext context) {
@@ -57,77 +37,114 @@ class _JobberMessagesScreenState extends State<JobberMessagesScreen> {
               ),
             ),
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 4.0,
-                ),
-                itemCount: _chatRooms.length,
-                itemBuilder: (context, index) {
-                  final room = _chatRooms[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: const Color(0xFF86D5F2),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
-                      leading: CircleAvatar(
-                        radius: 24,
-                        backgroundColor: Colors.grey.shade200,
-                        child: ClipOval(
-                          child: Image.asset(
-                            room['avatar'],
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(
-                                  Icons.person,
-                                  size: 30,
-                                  color: Colors.grey,
-                                ),
-                          ),
-                        ),
-                      ),
-                      title: Text(
-                        room['name'],
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      subtitle: Text(
-                        room['lastMessage'],
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => JobberChatRoomScreen(
-                              employerName: room['name'],
-                              job: room['job'],
+              child: currentUserId == null
+                  ? const Center(child: Text('กรุณาเข้าสู่ระบบก่อนใช้งานแชท'))
+                  : StreamBuilder<QuerySnapshot>(
+                      // 💡 ดึงห้องแชทที่ผู้รับจ้างเกี่ยวข้องแบบ Realtime
+                      stream: FirebaseFirestore.instance
+                          .collection('chats')
+                          .where('participants', arrayContains: currentUserId)
+                          .orderBy('updated_at', descending: true)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF86D5F2),
                             ),
+                          );
+                        }
+
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              'ยังไม่มีข้อความสนทนา',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 15,
+                              ),
+                            ),
+                          );
+                        }
+
+                        final docs = snapshot.data!.docs;
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 4.0,
                           ),
+                          itemCount: docs.length,
+                          itemBuilder: (context, index) {
+                            final chatData =
+                                docs[index].data() as Map<String, dynamic>;
+                            final chatId = docs[index].id;
+                            final jobTitle =
+                                chatData['job_title'] ?? 'งานบริการ';
+                            final lastMessage =
+                                chatData['last_message'] ?? 'เริ่มสนทนา';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: const Color(0xFF86D5F2),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 4,
+                                ),
+                                leading: CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: Colors.grey.shade200,
+                                  child: const Icon(
+                                    Icons.person,
+                                    size: 30,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                title: Text(
+                                  jobTitle,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  lastMessage,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => JobberChatRoomScreen(
+                                        employerName: jobTitle,
+                                        chatId:
+                                            chatId, // 💡 ส่ง chatId เข้าห้องแชท
+                                        job: chatData,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
                         );
                       },
                     ),
-                  );
-                },
-              ),
             ),
           ],
         ),
@@ -136,27 +153,17 @@ class _JobberMessagesScreenState extends State<JobberMessagesScreen> {
     );
   }
 
-  // ===========================================================================
-  // โครงสร้าง Bottom Navigation Bar ตามภาพต้นแบบที่ 2 เป๊ะๆ
-  // ===========================================================================
   Widget _buildCustomBottomNavBar() {
     return Container(
       height: 80,
       color: const Color(0xFF00AEEF),
-      // ปรับ padding ด้านบนเพื่อดันกลุ่มปุ่มและกล่องเขียวให้ร่นลงมา ไม่ชิดขอบบน
-      padding: const EdgeInsets.only(
-        left: 8,
-        right: 8,
-        top: 4, // <--- เพิ่มระยะเว้นจากขอบบน (ลองปรับ 8 - 12 ตามความพอดี)
-        bottom: 4,
-      ),
+      padding: const EdgeInsets.only(left: 8, right: 8, top: 4, bottom: 4),
       child: SafeArea(
         top: false,
         bottom: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
-          crossAxisAlignment: CrossAxisAlignment
-              .center, // จัดให้อยู่กึ่งกลางแนวตั้งของพื้นที่ที่เหลือ
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _buildNavItem(
               icon: Icons.home,
@@ -270,13 +277,18 @@ class _JobberMessagesScreenState extends State<JobberMessagesScreen> {
   }
 }
 
+// ===========================================================================
+// หน้าห้องแชทฝั่ง Jobber (Real-time Firestore)
+// ===========================================================================
 class JobberChatRoomScreen extends StatefulWidget {
   final String employerName;
+  final String? chatId; // 💡 เพิ่มรับ chatId
   final Map<String, dynamic> job;
 
   const JobberChatRoomScreen({
     Key? key,
     required this.employerName,
+    this.chatId,
     required this.job,
   }) : super(key: key);
 
@@ -287,35 +299,41 @@ class JobberChatRoomScreen extends StatefulWidget {
 class _JobberChatRoomScreenState extends State<JobberChatRoomScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
-  final List<Map<String, dynamic>> _messages = [
-    {
-      'sender': 'employer',
-      'text': 'สวัสดีครับ มาถึงบริเวณหน้าหมู่บ้านแล้วหรือยังครับ?',
-      'time': '16:25',
-    },
-    {
-      'sender': 'jobber',
-      'text': 'สวัสดีครับ กำลังเลี้ยวเข้าซอยหน้าหมู่บ้านครับผม',
-      'time': '16:26',
-    },
-  ];
-
-  void _sendMessage() {
+  // 💡 ฟังก์ชันส่งข้อความลง Firestore จริง
+  Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty) return;
-
-    setState(() {
-      _messages.add({
-        'sender': 'jobber',
-        'text': text,
-        'time':
-            '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-      });
-    });
+    if (text.isEmpty || widget.chatId == null || widget.chatId!.isEmpty) return;
 
     _messageController.clear();
 
+    try {
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(widget.chatId)
+          .collection('messages')
+          .add({
+            'sender_id': currentUserId,
+            'text': text,
+            'created_at': FieldValue.serverTimestamp(),
+          });
+
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(widget.chatId)
+          .update({
+            'last_message': text,
+            'updated_at': FieldValue.serverTimestamp(),
+          });
+
+      _scrollToBottom();
+    } catch (e) {
+      debugPrint('>>> ส่งข้อความไม่สำเร็จ: $e');
+    }
+  }
+
+  void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -346,7 +364,10 @@ class _JobberChatRoomScreenState extends State<JobberChatRoomScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          widget.job['jobType'] ?? widget.job['title'] ?? 'ข้อความ',
+          widget.job['jobType'] ??
+              widget.job['job_title'] ??
+              widget.job['title'] ??
+              'ข้อความ',
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -358,70 +379,100 @@ class _JobberChatRoomScreenState extends State<JobberChatRoomScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                final bool isMe = msg['sender'] == 'jobber';
+            child: widget.chatId == null || widget.chatId!.isEmpty
+                ? const Center(child: Text('ยังไม่มีห้องแชทในระบบ'))
+                : StreamBuilder<QuerySnapshot>(
+                    // 💡 ดึงข้อความแบบ Real-time จาก sub-collection messages
+                    stream: FirebaseFirestore.instance
+                        .collection('chats')
+                        .doc(widget.chatId)
+                        .collection('messages')
+                        .orderBy('created_at', descending: false)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF86D5F2),
+                          ),
+                        );
+                      }
 
-                return Align(
-                  alignment: isMe
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.75,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isMe ? const Color(0xFF86D5F2) : Colors.white,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(14),
-                        topRight: const Radius.circular(14),
-                        bottomLeft: Radius.circular(isMe ? 14 : 2),
-                        bottomRight: Radius.circular(isMe ? 2 : 14),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 3,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: isMe
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          msg['text'],
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.black87,
-                            height: 1.3,
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'เริ่มส่งข้อความคุยกันได้เลย!',
+                            style: TextStyle(color: Colors.black45),
                           ),
+                        );
+                      }
+
+                      final docs = snapshot.data!.docs;
+
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _scrollToBottom();
+                      });
+
+                      return ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          msg['time'],
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          final data =
+                              docs[index].data() as Map<String, dynamic>;
+                          final senderId = data['sender_id'] ?? '';
+                          final bool isMe = senderId == currentUserId;
+                          final text = data['text'] ?? '';
+
+                          return Align(
+                            alignment: isMe
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    MediaQuery.of(context).size.width * 0.75,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isMe
+                                    ? const Color(0xFF86D5F2)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(14),
+                                  topRight: const Radius.circular(14),
+                                  bottomLeft: Radius.circular(isMe ? 14 : 2),
+                                  bottomRight: Radius.circular(isMe ? 2 : 14),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.04),
+                                    blurRadius: 3,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                text,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black87,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

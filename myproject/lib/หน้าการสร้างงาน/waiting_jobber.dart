@@ -1,12 +1,13 @@
 // lib/หน้าการสร้างงาน/waiting_jobber.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../หน้าหลักjibber/home.dart';
-import '../หน้างานของฉัน/my_jobs.dart'; // แก้ไข path ให้ถอยหลัง 1 ระดับ
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../หน้างานของฉัน/my_jobs.dart';
 import 'jobber_candidates.dart';
 import 'edit_job.dart';
 
 class WaitingJobberScreen extends StatefulWidget {
+  final String? jobId;
   final String jobTitle;
   final String jobDesc;
   final String jobAddress;
@@ -18,6 +19,7 @@ class WaitingJobberScreen extends StatefulWidget {
 
   const WaitingJobberScreen({
     Key? key,
+    this.jobId,
     required this.jobTitle,
     this.jobDesc = 'ไม่มีรายละเอียดเพิ่มเติม',
     this.jobAddress = '123/45 หมู่บ้านสุขใจ ลาดพร้าว80',
@@ -34,7 +36,7 @@ class WaitingJobberScreen extends StatefulWidget {
 
 class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
   Timer? _countdownTimer;
-  Timer? _simulationCandidatesTimer;
+  StreamSubscription<DocumentSnapshot>? _jobSubscription;
   late int _remainingSeconds;
 
   late String _currentTitle;
@@ -56,7 +58,83 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
     _remainingSeconds = widget.initialRemainingSeconds;
 
     _startCountdown();
-    _startCandidatesSimulation();
+    _listenToJobApplicants(); // 💡 ฟัง Firestore จริง แทนการนับเวลา 10 วิ
+  }
+
+  // ===========================================================================
+  // ดักฟังข้อมูล Firestore แบบ Realtime (ตรวจจับเมื่อมีคนกดรับงาน)
+  // ===========================================================================
+  void _listenToJobApplicants() {
+    if (widget.jobId == null || widget.jobId!.isEmpty) return;
+
+    _jobSubscription?.cancel();
+    _jobSubscription = FirebaseFirestore.instance
+        .collection('jobs')
+        .doc(widget.jobId)
+        .snapshots()
+        .listen((snapshot) {
+          if (!mounted || !snapshot.exists) return;
+
+          final data = snapshot.data();
+          if (data != null && data['applicant_ids'] != null) {
+            final List applicants = List.from(data['applicant_ids']);
+            // ถ้ามีคนกดรับงานแล้ว ให้สลับไปหน้าคัดเลือกผู้สมัครทันที
+            if (applicants.isNotEmpty) {
+              _countdownTimer?.cancel();
+              _jobSubscription?.cancel();
+
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => JobberCandidatesScreen(
+                    jobId: widget.jobId,
+                    jobTitle: _currentTitle,
+                    jobDate: _currentDate,
+                    workTimeRange: _currentTime,
+                    wageAmount: _currentWage,
+                    feeAmount: widget.feeAmount,
+                    initialRemainingSeconds: _remainingSeconds,
+                  ),
+                ),
+              );
+            }
+          }
+        });
+  }
+
+  // อัปเดตสถานะยกเลิกงานใน Firestore
+  Future<void> _updateJobCancelledInFirestore() async {
+    try {
+      if (widget.jobId != null && widget.jobId!.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('jobs')
+            .doc(widget.jobId)
+            .update({
+              'status': 'cancelled',
+              'cancelled_at': FieldValue.serverTimestamp(),
+              'updated_at': FieldValue.serverTimestamp(),
+            });
+      }
+    } catch (e) {
+      debugPrint('>>> เกิดข้อผิดพลาดในการยกเลิกงาน Firestore: $e');
+    }
+  }
+
+  // อัปเดตการต่อเวลาใน Firestore
+  Future<void> _updateJobExtendedInFirestore() async {
+    try {
+      if (widget.jobId != null && widget.jobId!.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('jobs')
+            .doc(widget.jobId)
+            .update({
+              'extended_at': FieldValue.serverTimestamp(),
+              'updated_at': FieldValue.serverTimestamp(),
+            });
+      }
+    } catch (e) {
+      debugPrint('>>> เกิดข้อผิดพลาดในการต่อเวลา Firestore: $e');
+    }
   }
 
   // ตัวนับถอยหลังทีละ 1 วินาที
@@ -74,28 +152,6 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
       } else {
         timer.cancel();
         _showTimeoutDialog();
-      }
-    });
-  }
-
-  void _startCandidatesSimulation() {
-    _simulationCandidatesTimer?.cancel();
-    _simulationCandidatesTimer = Timer(const Duration(seconds: 10), () {
-      if (mounted) {
-        _countdownTimer?.cancel();
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => JobberCandidatesScreen(
-              jobTitle: _currentTitle,
-              jobDate: _currentDate,
-              workTimeRange: _currentTime,
-              wageAmount: _currentWage,
-              feeAmount: widget.feeAmount,
-              initialRemainingSeconds: _remainingSeconds,
-            ),
-          ),
-        );
       }
     });
   }
@@ -121,6 +177,7 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
       _remainingSeconds += 3600;
     });
     _startCountdown();
+    _updateJobExtendedInFirestore();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -133,19 +190,8 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
     );
   }
 
-  // จำลองหมดเวลาทันทีสำหรับทดสอบ
-  void _simulateTimeout() {
-    _simulationCandidatesTimer?.cancel();
-    _countdownTimer?.cancel();
-    setState(() {
-      _remainingSeconds = 0;
-    });
-    _showTimeoutDialog();
-  }
-
   // Pop-up เมื่อหมดเวลาเปิดรับงาน
   void _showTimeoutDialog() {
-    _simulationCandidatesTimer?.cancel();
     _countdownTimer?.cancel();
 
     showDialog(
@@ -198,9 +244,10 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                     child: SizedBox(
                       height: 44,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(ctx);
-                          // ส่งข้อมูลไปยังหน้า MyJobsScreen พร้อมแท็กงานที่ยกเลิก
+                          await _updateJobCancelledInFirestore();
+                          if (!mounted) return;
                           Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(
@@ -237,7 +284,6 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                         onPressed: () {
                           Navigator.pop(ctx);
                           _extendTime();
-                          _startCandidatesSimulation();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF98D819),
@@ -267,7 +313,6 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
   // Pop-up ยืนยันการยกเลิกงาน
   void _showCancelConfirmationDialog() {
     _countdownTimer?.cancel();
-    _simulationCandidatesTimer?.cancel();
 
     showDialog(
       context: context,
@@ -324,9 +369,10 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                       width: 78,
                       height: 38,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(dialogContext);
-                          // ส่งข้อมูลงานไปยัง MyJobsScreen เมื่อยืนยันการยกเลิก
+                          await _updateJobCancelledInFirestore();
+                          if (!mounted) return;
                           Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(
@@ -360,7 +406,6 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                         onPressed: () {
                           Navigator.pop(dialogContext);
                           _startCountdown();
-                          _startCandidatesSimulation();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF99E22B),
@@ -387,7 +432,6 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
 
   Future<void> _openEditScreen() async {
     _countdownTimer?.cancel();
-    _simulationCandidatesTimer?.cancel();
 
     final updatedData = await Navigator.push<Map<String, String>>(
       context,
@@ -420,13 +464,12 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
     }
 
     _startCountdown();
-    _startCandidatesSimulation();
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
-    _simulationCandidatesTimer?.cancel();
+    _jobSubscription?.cancel();
     super.dispose();
   }
 
@@ -441,20 +484,6 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          TextButton.icon(
-            onPressed: _simulateTimeout,
-            icon: const Icon(Icons.timer, color: Colors.orange, size: 18),
-            label: const Text(
-              'จำลองหมดเวลา',
-              style: TextStyle(
-                color: Colors.orange,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -472,6 +501,7 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
               ),
               const SizedBox(height: 14),
 
+              // การ์ดแสดงรายละเอียดงาน
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -548,12 +578,12 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
               ),
               const SizedBox(height: 16),
 
+              // ===============================================================
+              // กล่องแสดงสถานะรอ Jobber (ปรับให้เด็กนั่งชิดขอบล่างของกรอบสีฟ้า)
+              // ===============================================================
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 24,
-                  horizontal: 16,
-                ),
+                clipBehavior: Clip.antiAlias, // ให้รูปภาพตัดขอบมนพอดีกรอบ
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
@@ -562,30 +592,45 @@ class _WaitingJobberScreenState extends State<WaitingJobberScreen> {
                   ),
                 ),
                 child: Row(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.end, // 💡 วางชิดติดขอบล่าง
                   children: [
-                    SizedBox(
-                      width: 120,
-                      height: 120,
-                      child: Image.asset(
-                        'assets/WaitingJobber.jpg',
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16.0),
+                      child: SizedBox(
+                        width: 120,
+                        height: 120,
+                        child: Image.asset(
+                          'assets/WaitingJobber.jpg',
+                          fit: BoxFit.contain,
+                          alignment:
+                              Alignment.bottomCenter, // 💡 ตัวเด็กชิดติดขอบล่าง
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(
                               Icons.person_outline,
                               size: 50,
                               color: Colors.grey,
-                            ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                     const SizedBox(width: 14),
                     const Expanded(
-                      child: Text(
-                        'ตอนนี้ยังไม่มี Jobber\nเข้ามารับงาน...',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                          height: 1.4,
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          bottom: 30.0,
+                          right: 16.0,
+                          top: 20.0,
+                        ),
+                        child: Text(
+                          'ตอนนี้ยังไม่มี Jobber\nเข้ามารับงาน...',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                            height: 1.4,
+                          ),
                         ),
                       ),
                     ),

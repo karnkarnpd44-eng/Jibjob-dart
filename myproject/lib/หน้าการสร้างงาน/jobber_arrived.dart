@@ -1,9 +1,11 @@
 // lib/หน้าการสร้างงาน/jobber_arrived.dart
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../หน้าข้อความ/chat_room.dart';
 import 'jobber_working.dart';
 
 class JobberArrivedScreen extends StatelessWidget {
+  final String? jobId; // 💡 1. ประกาศตัวแปรรับค่าตรงนี้
   final String jobberName;
   final String rating;
   final String jobTitle;
@@ -14,6 +16,7 @@ class JobberArrivedScreen extends StatelessWidget {
 
   const JobberArrivedScreen({
     Key? key,
+    this.jobId, // 💡 2. เพิ่มเข้าใน Constructor
     required this.jobberName,
     required this.rating,
     required this.jobTitle,
@@ -22,6 +25,37 @@ class JobberArrivedScreen extends StatelessWidget {
     required this.wageAmount,
     this.feeAmount = 0.0,
   }) : super(key: key);
+  Future<void> _startWorking(BuildContext context) async {
+    if (jobId != null && jobId!.isNotEmpty) {
+      try {
+        await FirebaseFirestore.instance.collection('jobs').doc(jobId).update({
+          'status': 'working',
+          'started_at': FieldValue.serverTimestamp(),
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        debugPrint('>>> อัปเดตสถานะเริ่มงานไม่สำเร็จ: $e');
+      }
+    }
+
+    if (!context.mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => JobberWorkingScreen(
+          jobId: jobId,
+          jobberName: jobberName,
+          rating: rating,
+          jobTitle: jobTitle,
+          jobDate: jobDate,
+          workTimeRange: workTimeRange,
+          wageAmount: wageAmount,
+          feeAmount: feeAmount,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,8 +84,6 @@ class JobberArrivedScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // การ์ดแสดงสถานะ Jobber ถึงจุดนัดหมายแล้ว
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
@@ -61,7 +93,6 @@ class JobberArrivedScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    // ส่วนหัวการ์ด: แสดงรูปโปรไฟล์ ชื่อ และคะแนนรีวิว
                     Row(
                       children: [
                         CircleAvatar(
@@ -106,7 +137,6 @@ class JobberArrivedScreen extends StatelessWidget {
                                     color: Colors.black87,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
                               ],
                             ),
                           ],
@@ -114,8 +144,6 @@ class JobberArrivedScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 28),
-
-                    // ข้อความแจ้งเตือนสถานะ
                     const Text(
                       'Jobber ถึงจุดนัดหมายแล้ว!',
                       style: TextStyle(
@@ -125,19 +153,15 @@ class JobberArrivedScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // ภาพประกอบ Jobber ขี่มอเตอร์ไซค์
                     SizedBox(
                       height: 180,
                       width: double.infinity,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: Image.asset(
-                          'assets/jobber_arrived.png', // 👈 ใส่ path และชื่อไฟล์รูปภาพของคุณตรงนี้
-                          fit: BoxFit
-                              .contain, // หรือใช้ BoxFit.cover ถ้าอยากให้รูปเต็มกรอบ
+                          'assets/jobber_arrived.png',
+                          fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) {
-                            // ถ้ารูปโหลดไม่ติด จะแสดงเป็นไอคอนสำรองเดิม ไม่ให้แอปพัง
                             return Container(
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.25),
@@ -155,8 +179,7 @@ class JobberArrivedScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-
-                    // ปุ่มที่ 1: ไปที่แชทเพื่อตรวจสอบ
+                    const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
                       height: 48,
@@ -192,28 +215,11 @@ class JobberArrivedScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 14),
-
-                    // ปุ่มที่ 2: เริ่มงานได้เลย!
                     SizedBox(
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => JobberWorkingScreen(
-                                jobberName: jobberName,
-                                rating: rating,
-                                jobTitle: jobTitle,
-                                jobDate: jobDate,
-                                workTimeRange: workTimeRange,
-                                wageAmount: wageAmount,
-                                feeAmount: feeAmount,
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: () => _startWorking(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFF9A800),
                           foregroundColor: Colors.black87,

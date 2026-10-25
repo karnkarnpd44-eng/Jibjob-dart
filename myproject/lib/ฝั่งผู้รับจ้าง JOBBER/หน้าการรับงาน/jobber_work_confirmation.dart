@@ -1,5 +1,5 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'jobber_in_progress.dart';
 import '../หน้างานของฉัน/jobber_my_jobs.dart';
 
@@ -17,11 +17,6 @@ class JobberWorkConfirmationScreen extends StatefulWidget {
 class _JobberWorkConfirmationScreenState
     extends State<JobberWorkConfirmationScreen>
     with TickerProviderStateMixin {
-  // สถานะ: 'waiting_employer' (รอผู้จ้างอนุมัติ), 'approved' (ผู้จ้างอนุมัติแล้ว)
-  String _status = 'waiting_employer';
-  Timer? _timer;
-
-  // Animation Controllers สำหรับการสั่นของรถและควันไอเสีย
   late AnimationController _bikeVibrationController;
   late AnimationController _smokeController;
 
@@ -29,60 +24,74 @@ class _JobberWorkConfirmationScreenState
   void initState() {
     super.initState();
 
-    // 1. แอนิเมชันตัวรถสั่นเบาๆ ขณะติดเครื่องจอดรอ (Vibration loop)
     _bikeVibrationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 140),
     )..repeat(reverse: true);
 
-    // 2. แอนิเมชันควันพวยพุ่งออกจากท่อไอเสีย (Smoke loop)
     _smokeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat();
-
-    // จำลองสถานการณ์ 10 วินาที เมื่อครบเวลาระบบจะเปลี่ยนเป็นหน้า "ผู้จ้างอนุมัติเริ่มงาน!"
-    _timer = Timer(const Duration(seconds: 10), () {
-      if (mounted) {
-        setState(() {
-          _status = 'approved';
-        });
-      }
-    });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     _bikeVibrationController.dispose();
     _smokeController.dispose();
     super.dispose();
   }
 
-  // ฟังก์ชันกดย้อนกลับแล้วพาไปหน้า "งานของฉัน" ในหมวด "กำลังทำอยู่"
   void _navigateToMyJobsInProgress() {
-    _timer?.cancel();
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            JobberMyJobsScreen(inProgressJob: widget.job, initialIndex: 0),
+        builder: (context) => const JobberMyJobsScreen(initialIndex: 0),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_status == 'waiting_employer') {
-      return _buildWaitingEmployerView();
-    }
-    return _buildEmployerApprovedView();
+    final jobId = widget.job['id']?.toString() ?? '';
+
+    // 💡 ใช้ StreamBuilder ฟังสถานะจริงจาก Firestore แบบเรียลไทม์
+    return StreamBuilder<DocumentSnapshot>(
+      stream: jobId.isNotEmpty
+          ? FirebaseFirestore.instance.collection('jobs').doc(jobId).snapshots()
+          : const Stream.empty(),
+      builder: (context, snapshot) {
+        final Map<String, dynamic> jobData =
+            snapshot.hasData && snapshot.data!.exists
+            ? (snapshot.data!.data() as Map<String, dynamic>)
+            : widget.job;
+
+        final String status = jobData['status'] ?? 'jobber_arrived';
+
+        final String employerName =
+            jobData['employer_name'] ??
+            jobData['employerName'] ??
+            widget.job['employerName'] ??
+            'ผู้ว่าจ้าง';
+
+        // 💡 ถ้ารัฐสถานะใน Firestore เป็น 'working' แปลว่าผู้จ้างกดปุ่ม "เริ่มงานได้เลย!" แล้ว ให้เปลี่ยนเป็นหน้าอนุมัติทันที
+        if (status == 'working') {
+          return _buildEmployerApprovedView(jobData, employerName);
+        }
+
+        // ถ้ายังไม่ใช่ ให้ค้างหน้าจอรอผู้จ้างยืนยัน
+        return _buildWaitingEmployerView(jobData, employerName);
+      },
+    );
   }
 
   // ===========================================================================
-  // หน้าที่ 1: ถึงแล้ว! (รอผู้จ้างยืนยันเริ่มงาน - แสดง 10 วินาทีแรก)
+  // หน้าที่ 1: ถึงแล้ว! (รอผู้จ้างกดเริ่มงาน)
   // ===========================================================================
-  Widget _buildWaitingEmployerView() {
+  Widget _buildWaitingEmployerView(
+    Map<String, dynamic> jobData,
+    String employerName,
+  ) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -94,8 +103,7 @@ class _JobberWorkConfirmationScreenState
             color: Colors.black87,
             size: 20,
           ),
-          onPressed:
-              _navigateToMyJobsInProgress, // กดย้อนกลับไปหน้างานของฉัน (กำลังทำอยู่)
+          onPressed: _navigateToMyJobsInProgress,
         ),
       ),
       body: SafeArea(
@@ -114,8 +122,6 @@ class _JobberWorkConfirmationScreenState
               ),
             ),
             const SizedBox(height: 10),
-
-            // การ์ดพื้นหลังสีเขียวมิ้นต์ โค้งมนพร้อมมิติเงา
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -137,7 +143,6 @@ class _JobberWorkConfirmationScreenState
                 ),
                 child: Column(
                   children: [
-                    // ส่วนโปรไฟล์ผู้จ้าง
                     Row(
                       children: [
                         Stack(
@@ -184,7 +189,7 @@ class _JobberWorkConfirmationScreenState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              widget.job['employerName'] ?? 'ดนัย',
+                              employerName,
                               style: const TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.bold,
@@ -210,9 +215,7 @@ class _JobberWorkConfirmationScreenState
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 24),
-
                     const Text(
                       'ถึงจุดนัดหมายแล้ว!',
                       style: TextStyle(
@@ -222,12 +225,7 @@ class _JobberWorkConfirmationScreenState
                         letterSpacing: 0.3,
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
-                    // =========================================================
-                    // ส่วนภาพเคลื่อนไหว: รถจอดสั่น + ควันพุ่งออกจากท่อไอเสีย
-                    // =========================================================
                     Expanded(
                       child: Center(
                         child: AnimatedBuilder(
@@ -240,7 +238,6 @@ class _JobberWorkConfirmationScreenState
                               alignment: Alignment.center,
                               clipBehavior: Clip.none,
                               children: [
-                                // ตัวรถมอเตอร์ไซค์พร้อมการสั่นเบาๆ (Engine Idling)
                                 Transform.translate(
                                   offset: Offset(
                                     0,
@@ -259,102 +256,19 @@ class _JobberWorkConfirmationScreenState
                                             ),
                                   ),
                                 ),
-
-                                // ละอองควันไอเสียลูกที่ 1
-                                Positioned(
-                                  left: 38 - (_smokeController.value * 28),
-                                  bottom: 46 + (_smokeController.value * 18),
-                                  child: Opacity(
-                                    opacity: (1.0 - _smokeController.value)
-                                        .clamp(0.0, 1.0),
-                                    child: Transform.scale(
-                                      scale:
-                                          0.5 + (_smokeController.value * 0.9),
-                                      child: Container(
-                                        width: 14,
-                                        height: 14,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.85),
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.white.withOpacity(
-                                                0.3,
-                                              ),
-                                              blurRadius: 6,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                // ละอองควันไอเสียลูกที่ 2 (เหลื่อมจังหวะให้พวยพุ่งต่อเนื่อง)
-                                Positioned(
-                                  left:
-                                      32 -
-                                      (((_smokeController.value + 0.5) % 1.0) *
-                                          32),
-                                  bottom:
-                                      48 +
-                                      (((_smokeController.value + 0.5) % 1.0) *
-                                          22),
-                                  child: Opacity(
-                                    opacity:
-                                        (1.0 -
-                                                ((_smokeController.value +
-                                                        0.5) %
-                                                    1.0))
-                                            .clamp(0.0, 1.0),
-                                    child: Transform.scale(
-                                      scale:
-                                          0.6 +
-                                          (((_smokeController.value + 0.5) %
-                                                  1.0) *
-                                              1.0),
-                                      child: Container(
-                                        width: 18,
-                                        height: 18,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.75),
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.white.withOpacity(
-                                                0.2,
-                                              ),
-                                              blurRadius: 8,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
                               ],
                             );
                           },
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
-                    // ปุ่มสถานะจำลอง (กำลังรอผู้จ้างยืนยันเริ่มงาน)
                     Container(
                       width: double.infinity,
                       height: 50,
                       decoration: BoxDecoration(
                         color: const Color(0xFFD3E782),
                         borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
                       ),
                       alignment: Alignment.center,
                       child: const Row(
@@ -392,9 +306,22 @@ class _JobberWorkConfirmationScreenState
   }
 
   // ===========================================================================
-  // หน้าที่ 2: ผู้จ้างอนุมัติเริ่มงาน! (กดยืนยันเริ่มงานทั้งสองฝ่าย)
+  // หน้าที่ 2: ผู้จ้างอนุมัติเริ่มงาน!
   // ===========================================================================
-  Widget _buildEmployerApprovedView() {
+  Widget _buildEmployerApprovedView(
+    Map<String, dynamic> jobData,
+    String employerName,
+  ) {
+    final title = jobData['title'] ?? jobData['jobType'] ?? '-';
+    final date = jobData['job_date'] ?? jobData['date'] ?? '-';
+    final location = jobData['address'] ?? jobData['location'] ?? '-';
+    final timeRange = jobData['work_time_range'] ?? jobData['timeRange'] ?? '-';
+    final reward =
+        jobData['reward_amount']?.toString() ??
+        jobData['wageDetail'] ??
+        jobData['wage'] ??
+        '-';
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -406,11 +333,7 @@ class _JobberWorkConfirmationScreenState
             color: Colors.black87,
             size: 20,
           ),
-          onPressed: () {
-            setState(() {
-              _status = 'waiting_employer';
-            });
-          },
+          onPressed: _navigateToMyJobsInProgress,
         ),
       ),
       body: SafeArea(
@@ -429,8 +352,6 @@ class _JobberWorkConfirmationScreenState
                 ),
               ),
               const SizedBox(height: 20),
-
-              // กล่องรายละเอียดงาน (รับค่าแบบ Dynamic)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),
@@ -441,13 +362,6 @@ class _JobberWorkConfirmationScreenState
                     color: const Color(0xFFE2E8F0),
                     width: 1.2,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0F172A).withOpacity(0.04),
-                      blurRadius: 14,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,26 +388,12 @@ class _JobberWorkConfirmationScreenState
                       ],
                     ),
                     const SizedBox(height: 12),
-                    _buildApprovedInfoRow(
-                      'งาน',
-                      widget.job['jobType'] ?? widget.job['title'] ?? '-',
-                    ),
-                    _buildApprovedInfoRow('วันที่', widget.job['date'] ?? '-'),
-                    _buildApprovedInfoRow(
-                      'สถานที่',
-                      widget.job['location'] ?? '-',
-                    ),
-                    _buildApprovedInfoRow(
-                      'ช่วงเวลาทำงาน',
-                      widget.job['timeRange'] ?? '-',
-                    ),
-                    _buildApprovedInfoRow(
-                      'ค่าจ้าง',
-                      '${widget.job['wageDetail'] ?? widget.job['wage'] ?? '-'}',
-                    ),
+                    _buildApprovedInfoRow('งาน', title),
+                    _buildApprovedInfoRow('วันที่', date),
+                    _buildApprovedInfoRow('สถานที่', location),
+                    _buildApprovedInfoRow('ช่วงเวลาทำงาน', timeRange),
+                    _buildApprovedInfoRow('ค่าจ้าง', '$reward บาท'),
                     const SizedBox(height: 20),
-
-                    // ปุ่ม "เริ่มงาน!"
                     SizedBox(
                       width: double.infinity,
                       height: 48,
@@ -510,7 +410,7 @@ class _JobberWorkConfirmationScreenState
                             context,
                             MaterialPageRoute(
                               builder: (context) =>
-                                  JobberInProgressScreen(job: widget.job),
+                                  JobberInProgressScreen(job: jobData),
                             ),
                           );
                         },

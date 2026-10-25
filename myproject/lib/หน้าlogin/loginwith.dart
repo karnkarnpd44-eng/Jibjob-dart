@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:myproject/%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2login/condition.dart';
 import '../หน้าหลักjibber/home.dart';
-import '../services/auth_service.dart';
+import '../services/auth_service.dart'; // หรือ import '../auth_service.dart'; ตามตำแหน่งจริง
 import 'package:firebase_auth/firebase_auth.dart';
 
 class JibJobLoginPage extends StatelessWidget {
@@ -153,7 +153,7 @@ class _LoginBottomSheetContent extends StatefulWidget {
 }
 
 class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
-  int _selectedTab = 1; // ตั้งค่าเริ่มต้นให้เปิดแท็บ OTP ก่อน
+  int _selectedTab = 0; // 0 = รหัสผ่าน, 1 = รหัส OTP
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _verificationId;
@@ -174,6 +174,56 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
     super.dispose();
   }
 
+  // ฟังก์ชันล็อกอินด้วยรหัสผ่านจริง
+  void _handlePasswordLogin() async {
+    final identifier = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (identifier.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณากรอกเบอร์โทร/อีเมล และรหัสผ่านให้ครบถ้วน'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _authService.loginWithPassword(
+        identifier: identifier,
+        password: password,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // ปิด BottomSheet
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('เข้าสู่ระบบสำเร็จ'),
+          backgroundColor: Color(0xFF22C55E),
+        ),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   // ฟังก์ชันขอส่งรหัส OTP ไปยัง Firebase
   void _handleSendOTP() async {
     final phone = _phoneController.text.trim();
@@ -189,7 +239,6 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
     await _authService.sendOTP(
       phoneNumber: phone,
       onCodeSent: (verificationId) {
-        if (!mounted) return;
         setState(() {
           _verificationId = verificationId;
           _isLoading = false;
@@ -202,7 +251,6 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
         );
       },
       onError: (errorMessage) {
-        if (!mounted) return;
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -224,9 +272,7 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
       return;
     }
 
-    // ดึง verificationId จากตัวแปรหน้าจอ หรือจาก AuthService โดยตรง
     final currentVerifyId = _verificationId ?? AuthService.verifyId;
-
     if (currentVerifyId == null || currentVerifyId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -252,18 +298,23 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
         if (!mounted) return;
         Navigator.pop(context); // ปิด BottomSheet
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ยืนยันตัวตนสำเร็จ กำลังเข้าสู่หน้าหลัก...'),
-            backgroundColor: Color(0xFF22C55E),
-          ),
-        );
-
-        // นำทางเข้าสู่หน้าหลัก
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+        if (exists) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ยืนยัน OTP สำเร็จ กำลังเข้าสู่ระบบ...'),
+              backgroundColor: Color(0xFF22C55E),
+            ),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -443,7 +494,7 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
             ],
 
             // -------------------------------------------------------------
-            // แท็บ 1: เข้าด้วย OTP[cite: 4, 26, 40]
+            // แท็บ 1: เข้าด้วย OTP
             // -------------------------------------------------------------
             if (_selectedTab == 1) ...[
               Row(
@@ -531,16 +582,7 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
                   ? null
                   : (_selectedTab == 1
                         ? _handleVerifyAndLogin
-                        : () {
-                            // กรณีล็อกอินด้วยรหัสผ่าน นำทางเข้าหน้าหลัก
-                            Navigator.pop(context);
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const HomeScreen(),
-                              ),
-                            );
-                          }),
+                        : _handlePasswordLogin),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0F2B48),
                 minimumSize: const Size.fromHeight(50),
@@ -549,7 +591,14 @@ class _LoginBottomSheetContentState extends State<_LoginBottomSheetContent> {
                 ),
               ),
               child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
                   : const Text(
                       'เข้าสู่ระบบ',
                       style: TextStyle(

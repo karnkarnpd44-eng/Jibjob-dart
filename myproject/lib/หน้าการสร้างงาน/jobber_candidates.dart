@@ -1,10 +1,12 @@
 // lib/หน้าการสร้างงาน/jobber_candidates.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../หน้างานของฉัน/my_jobs.dart';
-import 'jobber_tracking.dart';
+import 'jibber_tracking.dart';
 
 class JobberCandidatesScreen extends StatefulWidget {
+  final String? jobId; // 💡 รับรหัสงานจริงจาก Firestore
   final String jobTitle;
   final String jobDate;
   final String workTimeRange;
@@ -14,6 +16,7 @@ class JobberCandidatesScreen extends StatefulWidget {
 
   const JobberCandidatesScreen({
     Key? key,
+    this.jobId,
     required this.jobTitle,
     required this.jobDate,
     required this.workTimeRange,
@@ -30,51 +33,8 @@ class _JobberCandidatesScreenState extends State<JobberCandidatesScreen> {
   Timer? _countdownTimer;
   late int _remainingSeconds;
 
-  // ข้อมูล Jobber แต่ละคน พร้อมข้อความแนะนำตัวและรูป 5 รูป
-  final List<Map<String, dynamic>> _candidates = [
-    {
-      'name': 'สมชาย สายลุย',
-      'rating': '4.9',
-      'distance': '1.2 กม.',
-      'bio':
-          'รักสัตว์ เลี้ยงสุนัขพันธุ์ใหญ่มาตลอด 5 ปี ใจเย็น แข็งแรง พาวิ่งออกกำลังกายได้สบายครับ',
-      'images': [
-        'assets/sample1.png',
-        'assets/sample2.png',
-        'assets/sample3.png',
-        'assets/sample4.png',
-        'assets/sample5.png',
-      ],
-    },
-    {
-      'name': 'วิภาดา รักสัตว์',
-      'rating': '4.8',
-      'distance': '2.5 กม.',
-      'bio':
-          'มีประสบการณ์ดูแลสุนัขและแมว เป็นมิตร ตรงต่อเวลา อัปเดตรูปและพิกัดให้ตลอดเวลาการจ้างงานค่ะ',
-      'images': [
-        'assets/sample1.png',
-        'assets/sample2.png',
-        'assets/sample3.png',
-        'assets/sample4.png',
-        'assets/sample5.png',
-      ],
-    },
-    {
-      'name': 'กิตติพงษ์ ตรงเวลา',
-      'rating': '5.0',
-      'distance': '3.1 กม.',
-      'bio':
-          'ทำงานด้วยความรับผิดชอบ ซื่อสัตย์ ตรงต่อเวลา พร้อมเริ่มงานตามเวลาที่กำหนดทันทีครับ',
-      'images': [
-        'assets/sample1.png',
-        'assets/sample2.png',
-        'assets/sample3.png',
-        'assets/sample4.png',
-        'assets/sample5.png',
-      ],
-    },
-  ];
+  // ข้อมูล Jobber สำรอง (Fallback/Mock) เผื่อไม่มีผู้สมัครจริง
+  final List<Map<String, dynamic>> _fallbackCandidates = [];
 
   Map<String, dynamic>? _viewingCandidate;
 
@@ -116,6 +76,24 @@ class _JobberCandidatesScreenState extends State<JobberCandidatesScreen> {
       return '$minutes นาที $seconds วิ';
     } else {
       return '$seconds วินาที';
+    }
+  }
+
+  // 💡 ฟังก์ชันบันทึกการยกเลิกงานลง Cloud Firestore
+  Future<void> _updateJobCancelledInFirestore() async {
+    try {
+      if (widget.jobId != null && widget.jobId!.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('jobs')
+            .doc(widget.jobId)
+            .update({
+              'status': 'cancelled', // ปรับสถานะเป็น cancelled
+              'cancelled_at': FieldValue.serverTimestamp(),
+              'updated_at': FieldValue.serverTimestamp(),
+            });
+      }
+    } catch (e) {
+      debugPrint('>>> เกิดข้อผิดพลาดในการยกเลิกงาน Firestore: $e');
     }
   }
 
@@ -200,8 +178,10 @@ class _JobberCandidatesScreenState extends State<JobberCandidatesScreen> {
                     child: SizedBox(
                       height: 44,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(ctx);
+                          await _updateJobCancelledInFirestore();
+                          if (!mounted) return;
                           Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(
@@ -319,18 +299,24 @@ class _JobberCandidatesScreenState extends State<JobberCandidatesScreen> {
                       ),
                     ),
                     const Spacer(),
+                    // 💡 ปุ่ม "ใช่" -> บันทึกสถานะ cancelled ลง Firestore
                     SizedBox(
                       width: 78,
                       height: 38,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(dialogContext);
+                          // 1. อัปเดตสถานะ cancelled ลง Firestore
+                          await _updateJobCancelledInFirestore();
+                          if (!mounted) return;
+                          // 2. เด้งกลับไปที่หน้างานของฉัน ในแท็บรอตอบรับ
                           Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(
                               builder: (context) => MyJobsScreen(
                                 activeJobTitle: widget.jobTitle,
                                 activeJobDate: widget.jobDate,
+                                initialTab: 'waiting',
                                 isCancelled: true,
                               ),
                             ),
@@ -351,6 +337,7 @@ class _JobberCandidatesScreenState extends State<JobberCandidatesScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // ปุ่ม "ไม่ใช่"
                     SizedBox(
                       width: 78,
                       height: 38,
@@ -524,135 +511,43 @@ class _JobberCandidatesScreenState extends State<JobberCandidatesScreen> {
               ),
               const SizedBox(height: 20),
 
-              // รายชื่อผู้สมัคร
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.black12, width: 1.2),
-                ),
-                child: Column(
-                  children: _candidates.asMap().entries.map((entry) {
-                    final int idx = entry.key;
-                    final candidate = entry.value;
-                    final bool isLast = idx == _candidates.length - 1;
+              // ===============================================================
+              // รายชื่อผู้สมัคร (ดึงสดจาก Firestore jobs -> applicant_ids)
+              // ===============================================================
+              StreamBuilder<DocumentSnapshot>(
+                stream: widget.jobId != null && widget.jobId!.isNotEmpty
+                    ? FirebaseFirestore.instance
+                          .collection('jobs')
+                          .doc(widget.jobId)
+                          .snapshots()
+                    : const Stream.empty(),
+                builder: (context, snapshot) {
+                  List<String> applicantUids = [];
 
-                    return Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 12.0,
-                          ),
-                          child: Row(
-                            children: [
-                              // กดรูปโปรไฟล์
-                              InkWell(
-                                onTap: () => setState(
-                                  () => _viewingCandidate = candidate,
-                                ),
-                                borderRadius: BorderRadius.circular(28),
-                                child: CircleAvatar(
-                                  radius: 28,
-                                  backgroundColor: Colors.grey[200],
-                                  child: const Icon(
-                                    Icons.person,
-                                    color: Colors.grey,
-                                    size: 36,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
+                  if (snapshot.hasData && snapshot.data!.exists) {
+                    final data = snapshot.data!.data() as Map<String, dynamic>?;
+                    if (data != null && data['applicant_ids'] != null) {
+                      applicantUids = List<String>.from(data['applicant_ids']);
+                    }
+                  }
 
-                              // รายละเอียดชื่อ + ดาว + ปุ่ม "ดูโปรไฟล์" สีฟ้า
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      candidate['name'],
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.star,
-                                          color: Colors.amber,
-                                          size: 16,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${candidate['rating']} ( ${candidate['distance']} )',
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.black54,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    // 🌟 ปุ่มดูโปรไฟล์สีฟ้า
-                                    InkWell(
-                                      onTap: () => setState(
-                                        () => _viewingCandidate = candidate,
-                                      ),
-                                      child: const Text(
-                                        'ดูโปรไฟล์',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Color(0xFF00A3E0),
-                                          fontWeight: FontWeight.bold,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              // ปุ่มเลือกทำงาน
-                              ElevatedButton(
-                                onPressed: () => _selectJobber(candidate),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF8CD837),
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                child: const Text(
-                                  'เลือก',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (!isLast)
-                          const Divider(
-                            height: 1,
-                            indent: 16,
-                            endIndent: 16,
-                            color: Colors.black12,
-                          ),
-                      ],
+                  if (applicantUids.isNotEmpty) {
+                    return FutureBuilder<List<Map<String, dynamic>>>(
+                      future: _fetchApplicantsData(applicantUids),
+                      builder: (context, userSnap) {
+                        final displayList = userSnap.data ?? [];
+                        if (displayList.isEmpty) {
+                          return _buildCandidateContainer(_fallbackCandidates);
+                        }
+                        return _buildCandidateContainer(displayList);
+                      },
                     );
-                  }).toList(),
-                ),
+                  }
+
+                  return _buildCandidateContainer(_fallbackCandidates);
+                },
               ),
+
               const SizedBox(height: 16),
 
               // ปุ่มต่อเวลา
@@ -718,6 +613,165 @@ class _JobberCandidatesScreenState extends State<JobberCandidatesScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ดึงข้อมูลโปรไฟล์ผู้สมัครจาก users collection
+  Future<List<Map<String, dynamic>>> _fetchApplicantsData(
+    List<String> uids,
+  ) async {
+    List<Map<String, dynamic>> results = [];
+    for (String uid in uids) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .get();
+        if (doc.exists && doc.data() != null) {
+          final uData = doc.data()!;
+          results.add({
+            'id': uid,
+            'name': uData['full_name'] ?? 'ผู้รับจ้าง',
+            'rating': (uData['rating_score'] ?? 5.0).toString(),
+            'distance': '1.2 กม.',
+            'bio': 'พร้อมรับงานทันที ตรงต่อเวลา และใส่ใจในงานครับ',
+            'images': [
+              'assets/sample1.png',
+              'assets/sample2.png',
+              'assets/sample3.png',
+              'assets/sample4.png',
+              'assets/sample5.png',
+            ],
+          });
+        }
+      } catch (e) {
+        debugPrint('>>> เกิดข้อผิดพลาดในการดึงข้อมูล applicant: $e');
+      }
+    }
+    return results;
+  }
+
+  // กล่องแสดงรายชื่อ Jobber
+  Widget _buildCandidateContainer(List<Map<String, dynamic>> candidates) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.black12, width: 1.2),
+      ),
+      child: Column(
+        children: candidates.asMap().entries.map((entry) {
+          final int idx = entry.key;
+          final candidate = entry.value;
+          final bool isLast = idx == candidates.length - 1;
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 12.0,
+                ),
+                child: Row(
+                  children: [
+                    InkWell(
+                      onTap: () =>
+                          setState(() => _viewingCandidate = candidate),
+                      borderRadius: BorderRadius.circular(28),
+                      child: CircleAvatar(
+                        radius: 28,
+                        backgroundColor: Colors.grey[200],
+                        child: const Icon(
+                          Icons.person,
+                          color: Colors.grey,
+                          size: 36,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            candidate['name'],
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.star,
+                                color: Colors.amber,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${candidate['rating']} ( ${candidate['distance']} )',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          InkWell(
+                            onTap: () =>
+                                setState(() => _viewingCandidate = candidate),
+                            child: const Text(
+                              'ดูโปรไฟล์',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF00A3E0),
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => _selectJobber(candidate),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF8CD837),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 8,
+                        ),
+                      ),
+                      child: const Text(
+                        'เลือก',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isLast)
+                const Divider(
+                  height: 1,
+                  indent: 16,
+                  endIndent: 16,
+                  color: Colors.black12,
+                ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
@@ -916,18 +970,38 @@ class _JobberCandidatesScreenState extends State<JobberCandidatesScreen> {
     );
   }
 
-  // ส่งข้อมูลไปยังหน้า jobber_tracking.dart
-  void _selectJobber(Map<String, dynamic> candidate) {
+  // ===========================================================================
+  // เมื่อผู้ว่าจ้างกดปุ่ม "เลือก" -> บันทึกสถานะรับงานลง Firestore
+  // ===========================================================================
+  void _selectJobber(Map<String, dynamic> candidate) async {
     _countdownTimer?.cancel();
+
+    try {
+      if (widget.jobId != null && widget.jobId!.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('jobs')
+            .doc(widget.jobId)
+            .update({
+              'status': 'accepted',
+              'jobber_id': candidate['id'],
+              'jobber_name': candidate['name'],
+              'accepted_at': FieldValue.serverTimestamp(),
+              'updated_at': FieldValue.serverTimestamp(),
+            });
+      }
+    } catch (e) {
+      debugPrint('>>> อัปเดตการเลือก Jobber ลง Firestore ไม่สำเร็จ: $e');
+    }
+
+    if (!mounted) return;
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (context) => JobberTrackingScreen(
           jobberName: candidate['name']?.toString() ?? 'กิตติพงษ์',
           rating: candidate['rating']?.toString() ?? '4.5',
-          distance:
-              candidate['distance']?.toString() ??
-              '1.5 กม.', // ✅ เพิ่มบรรทัดนี้เข้ามาให้ครบตามที่ JobberTrackingScreen ต้องการ
+          distance: candidate['distance']?.toString() ?? '1.5 กม.',
           jobTitle: widget.jobTitle,
           jobDate: widget.jobDate,
           workTimeRange: widget.workTimeRange,
